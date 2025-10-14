@@ -1,0 +1,30 @@
+[90m= [39m[34;4mApp\Models\User[39;24m {#5844
+    [34mid[39m: [35m2[39m,
+    [34muser_name[39m: "[32misaac_sanchez_neri[39m",
+    #[33mpassword[39m: "[32m$2y$12$sKJqSizxAvD4MgGXzryQ2e7l5JBaRNCMlzfgX6UL5pykw5MAnVeNK[39m",
+    [34mcorreo[39m: [36mnull[39m,
+    [34mapellido_paterno[39m: "[32mIsaac Sánchez Neri[39m",
+    [34mapellido_materno[39m: "",
+    [34mtelefono[39m: [36mnull[39m,
+    [34mdepartamento_id[39m: [35m1[39m,
+    [34mtipo_usuario_id[39m: [35m2[39m,
+    [34msucursal_id[39m: [36mnull[39m,
+    [34mcreated_at[39m: "[32m2025-10-14 18:24:36[39m",
+    [34mupdated_at[39m: "[32m2025-10-14 12:24:36[39m",
+  }
+
+[90m= [39m[34;4mApp\Models\User[39;24m {#5844
+    [34mid[39m: [35m2[39m,
+    [34muser_name[39m: "[32misaac_sanchez_neri[39m",
+    #[33mpassword[39m: "[32m$2y$12$sKJqSizxAvD4MgGXzryQ2e7l5JBaRNCMlzfgX6UL5pykw5MAnVeNK[39m",
+    [34mcorreo[39m: [36mnull[39m,
+    [34mapellido_paterno[39m: "[32mIsaac Sánchez Neri[39m",
+    [34mapellido_materno[39m: "",
+    [34mtelefono[39m: [36mnull[39m,
+    [34mdepartamento_id[39m: [35m1[39m,
+    [34mtipo_usuario_id[39m: [35m2[39m,
+    [34msucursal_id[39m: [36mnull[39m,
+    [34mcreated_at[39m: "[32m2025-10-14 18:24:36[39m",
+    [34mupdated_at[39m: "[32m2025-10-14 12:24:36[39m",
+  }
+
