@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -28,7 +29,6 @@ class User extends Authenticatable
         'remember_token',
     ];
 
-    // <-- CORREGIDO: propiedad $casts en lugar de method
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
@@ -39,13 +39,13 @@ class User extends Authenticatable
         return $this->correo;
     }
 
-    // Para que Breeze use 'correo' en lugar de 'email' (si ya lo adaptaste)
     public function getAuthIdentifierName()
     {
-        return 'correo'; // o 'user_name' si prefieres login con username
+        return 'correo';
     }
 
-    // Relaciones
+    // ==================== RELACIONES ====================
+    
     public function departamento()
     {
         return $this->belongsTo(Departamento::class, 'departamento_id');
@@ -61,28 +61,49 @@ class User extends Authenticatable
         return $this->hasMany(Rendimiento::class, 'usuario_id');
     }
 
-    // Helper: verifica si es jefe
+    public function sucursal()
+    {
+        return $this->belongsTo(Sucursal::class, 'sucursal_id');
+    }
+
+    /**
+     * Relación: empleados del mismo departamento (solo tipo empleado).
+     * Para jefes: retorna los empleados de su departamento.
+     * Uso: $jefe->empleados
+     */
+    public function empleados()
+    {
+        return $this->hasMany(self::class, 'departamento_id', 'departamento_id')
+                    ->where('tipo_usuario_id', 3)
+                    ->where('id', '!=', $this->id);
+    }
+
+    // ==================== HELPERS ====================
+    
     public function esJefe()
     {
         return $this->tipo_usuario_id == 2;
     }
 
-    // Helper: verifica si es superusuario
     public function esSuperusuario()
     {
         return $this->tipo_usuario_id == 1;
     }
 
-    /**
-     * Relación auxiliar: obtener empleados que pertenecen al mismo departamento del jefe.
-     * Filtra por tipo_usuario_id = 3 (empleado).
-     * Uso: $jefe->empleados
-     */
-    public function empleados()
+    public function esEmpleado()
     {
-        // Si el usuario no tiene departamento_id, devolvemos una relación vacía mediante whereNull/where impossible.
-        // Pero Eloquent permite devolver hasMany con la misma columna departamento_id.
-        return $this->hasMany(self::class, 'departamento_id', 'departamento_id')
-                    ->where('tipo_usuario_id', 3);
+        return $this->tipo_usuario_id == 3;
+    }
+
+    public function getNombreCompletoAttribute()
+    {
+        return trim("{$this->apellido_paterno} {$this->apellido_materno}");
+    }
+
+    public function evaluacionActual()
+    {
+        return $this->hasOne(Rendimiento::class, 'usuario_id')
+                    ->whereDate('fecha', today())
+                    ->with('nineBox');
     }
 }

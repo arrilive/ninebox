@@ -17,11 +17,9 @@ class Departamento extends Model
     /**
      * Relación: jefe del departamento.
      * Se asume que la tabla 'departamentos' tiene campo 'jefe_id' que referencia usuarios.id
-     * (si no existe ese campo, omite esta relación o ajusta según tu esquema).
      */
     public function jefe()
     {
-        // El departamento tiene un jefe que es un usuario con id = jefe_id
-        return $this->hasOne(\App\Models\User::class, 'id', 'jefe_id');
+        return $this->belongsTo(\App\Models\User::class, 'jefe_id');
     }
 }

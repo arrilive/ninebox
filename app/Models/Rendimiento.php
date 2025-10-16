@@ -6,14 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 class Rendimiento extends Model
 {
     protected $table = 'rendimientos';
-    
-    // No usa incrementing ID porque la PK es compuesta
-    public $incrementing = false;
-    
-    // La PK compuesta
-    protected $primaryKey = ['usuario_id', 'fecha'];
 
-    // Desactivar timestamps automáticos (solo tienes created_at)
+    // Ahora usamos PK auto-incremental
+    protected $primaryKey = 'id';
+    public $incrementing = true;
+
+    // Desactivar timestamps automáticos de updated_at
     const UPDATED_AT = null;
 
     protected $fillable = [
@@ -30,12 +28,12 @@ class Rendimiento extends Model
     // Relación con usuario
     public function usuario()
     {
-        return $this->belongsTo(User::class, 'usuario_id');
+        return $this->belongsTo(\App\Models\User::class, 'usuario_id');
     }
 
     // Relación con cuadrante de 9-box
     public function nineBox()
     {
-        return $this->belongsTo(NineBox::class, 'ninebox_id');
+        return $this->belongsTo(\App\Models\NineBox::class, 'ninebox_id');
     }
 }
