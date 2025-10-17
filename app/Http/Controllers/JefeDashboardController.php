@@ -36,8 +36,10 @@ class JefeDashboardController extends Controller
             ->whereDate('fecha', today())
             ->with('usuario', 'nineBox')
             ->get()
-            ->groupBy('ninebox_id');
-
+            ->groupBy('ninebox_id')
+            ->map(fn($grupo) => $grupo->count())
+            ->toArray();
+            
         $empleadosEvaluados = Rendimiento::whereIn('usuario_id', $empleados->pluck('id'))
             ->whereDate('fecha', today())
             ->distinct('usuario_id')

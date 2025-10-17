@@ -5,7 +5,7 @@
     <form method="POST" action="{{ route('login') }}">
         @csrf
 
-        <!-- Correo Electrónico -->
+        <!-- Correo Electrónico - MANTENER 'correo' -->
         <div>
             <x-input-label for="correo" :value="__('Correo Electrónico')" />
             <x-text-input id="correo" 
