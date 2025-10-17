@@ -1,112 +1,101 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-                <h2 class="font-semibold text-2xl text-gray-800 dark:text-gray-200 leading-tight">
-                    Bienvenido, {{ $jefe->apellido_paterno }} {{ $jefe->apellido_materno }}
-                </h2>
-                <p class="text-gray-600 dark:text-gray-400">
-                    Departamento: <span class="font-semibold">{{ $jefe->departamento->nombre_departamento ?? 'Sin departamento' }}</span>
-                </p>
-            </div>
-            <div class="text-right">
-                <span class="inline-block bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-4 py-2 rounded-lg font-semibold shadow-lg">
-                    {{ now()->locale('es')->isoFormat('D [de] MMMM [de] YYYY') }}
-                </span>
-            </div>
-        </div>
-    </x-slot>
-
-    <div class="py-8">
+    <div class="py-6">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex flex-col lg:flex-row gap-6">
-                {{-- Sidebar resumen (solo este bloque) --}}
-                <div class="lg:w-64 flex-shrink-0">
-                  <aside class="rounded-2xl shadow-2xl border border-white/10 dark:border-gray-700/40 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md sticky top-4 overflow-hidden">
+            <div class="flex flex-col lg:flex-row gap-8">
+                {{-- Sidebar resumen (look & feel como el modal) --}}
+                @php
+                    $total = max(1, count($empleados));
+                    $pendientes = max(0, $total - $empleadosEvaluados);
+                    $pct = min(100, round(($empleadosEvaluados / $total) * 100));
+                @endphp
 
-                    {{-- Header con el mismo gradiente del modal --}}
-                    <div class="px-5 py-4 bg-gradient-to-r from-indigo-700 via-purple-700 to-indigo-800 relative">
-                      <div class="absolute inset-0 bg-black/10"></div>
-                      <div class="relative flex items-center gap-3">
-                        <div class="shrink-0 w-10 h-10 rounded-xl grid place-items-center bg-white/15 border border-white/20 backdrop-blur-sm">
-                          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M9 17v-6a2 2 0 012-2h8M9 7h.01M13 17h6" />
-                          </svg>
+                <aside class="lg:w-80 flex-shrink-0
+                        rounded-2xl shadow-2xl
+                        border border-white/10 dark:border-gray-700/40
+                        bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg
+                        sticky top-4 overflow-hidden">
+                    {{-- Header a juego con el modal (sin icono) --}}
+                    <div class="px-6 py-6 bg-gradient-to-r from-indigo-700 via-purple-700 to-indigo-800 relative">
+                        <div class="absolute inset-0 bg-black/10"></div>
+                        <div class="relative">
+                            <h3 id="sidebar-title" class="text-white font-extrabold text-3xl tracking-tight">Resumen</h3>
+                            <p class="text-white/90 text-xl leading-snug">Estado de tu 9-Box</p>
                         </div>
-                        <div>
-                          <h3 class="text-white font-extrabold text-lg tracking-tight">Resumen</h3>
-                          <p class="text-white/80 text-sm">Estado de tu 9-Box</p>
-                        </div>
-                      </div>
                     </div>
 
                     {{-- Cuerpo --}}
-                    <div class="p-5 space-y-5">
-                      {{-- KPIs --}}
-                      <section class="space-y-4">
-                        <article class="rounded-xl px-4 py-3 border-l-4 border-blue-500 bg-white/60 dark:bg-white/5 shadow-sm">
-                          <div class="text-blue-600 dark:text-white text-xs font-semibold">Total Empleados</div>
-                          <div id="total-empleados" class="font-extrabold text-[1.85rem] leading-tight text-slate-900 dark:text-white">
-                            {{ count($empleados) }}
-                          </div>
-                        </article>
+                    <div class="p-7 space-y-7">
+                        {{-- KPIs (bloque único estilo modal-glass) --}}
+                        <section aria-label="Indicadores clave">
+                          <div class="kpi-glass">
+                            <div class="kpi-brace kpi-brace--left" aria-hidden="true"></div>
+                            <div class="kpi-brace kpi-brace--right" aria-hidden="true"></div>
 
-                        <article class="rounded-xl px-4 py-3 border-l-4 border-green-600 bg-white/60 dark:bg-white/5 shadow-sm">
-                          <div class="text-green-600 dark:text-green-400 text-xs font-semibold">Evaluados</div>
-                          <div id="empleados-evaluados" class="font-extrabold text-[1.85rem] leading-tight text-slate-900 dark:text-white">
-                            {{ $empleadosEvaluados }}
-                          </div>
-                        </article>
+                            <div class="kpi-row">
+                              <span class="kpi-label text-gray-900 dark:text-gray-100">Total Empleados</span>
+                              <span id="total-empleados" class="kpi-value">{{ $total }}</span>
+                            </div>
 
-                        <article class="rounded-xl px-4 py-3 border-l-4 border-red-600 bg-white/60 dark:bg-white/5 shadow-sm">
-                          <div class="text-red-600 dark:text-red-400 text-xs font-semibold">Por Evaluar</div>
-                          <div id="empleados-pendientes" class="font-extrabold text-[1.85rem] leading-tight text-slate-900 dark:text-white">
-                            {{ count($empleados) - $empleadosEvaluados }}
-                          </div>
-                        </article>
-                      </section>
+                            <div class="kpi-row">
+                              <span class="kpi-label text-emerald-600 dark:text-emerald-400">Evaluados</span>
+                              <span id="empleados-evaluados" class="kpi-value">{{ $empleadosEvaluados }}</span>
+                            </div>
 
-                      {{-- Barra de progreso (SSR + JS) --}}
-                      @php
-                        $total = max(1, count($empleados));
-                        $pct = min(100, round(($empleadosEvaluados / $total) * 100));
-                      @endphp
-                      <section>
-                        <div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-2">
-                          <span>Avance</span>
+                            <div class="kpi-row">
+                              <span class="kpi-label text-rose-600 dark:text-rose-400">Por Evaluar</span>
+                              <span id="empleados-pendientes" class="kpi-value">{{ $pendientes }}</span>
+                            </div>
+                          </div>
+                        </section>
+
+                        {{-- Barra de progreso (SSR + JS) - tu lógica intacta --}}
+                        @php
+                          $total = max(1, count($empleados));
+                          $pct = min(100, round(($empleadosEvaluados / $total) * 100));
+                        @endphp
+                        <section>
+                          <div class="flex items-center justify-between text-xl text-gray-900 dark:text-gray-300 mb-2">
+                            <span class="font-semibold tracking-tight">Avance</span>
+                          </div>
+                          <div class="w-full h-6 bg-gray-200 rounded-full dark:bg-gray-700 overflow-hidden">
+                            <div id="avance-bar"
+                                 class="h-6 bg-blue-600 text-center rounded-full text-white transition-[width] duration-300 ease-in-out"
+                                 style="width: {{ $pct }}%;">
+                                {{ $pct }}%
+                            </div>
+                          </div>
+                        </section>
+
+                        {{-- CTA --}}
+                        <div>
+                            <button
+                                id="btn-guardar-evaluacion"
+                                type="button"
+                                onclick="guardarEvaluacion()"
+                                class="btn-accion w-full text-lg
+                                    bg-gradient-to-r from-indigo-600 to-purple-600
+                                    hover:from-indigo-700 hover:to-purple-700
+                                    text-white py-3.5 rounded-xl font-semibold
+                                    transition-all duration-200 transform hover:scale-[1.02] active:scale-95
+                                    shadow-lg
+                                    disabled:cursor-not-allowed
+                                    disabled:hover:scale-100"
+                                {{ $pendientes > 0 ? 'disabled' : '' }}
+                                aria-disabled="{{ $pendientes > 0 ? 'true' : 'false' }}"
+                            >
+                                Guardar Evaluación
+                            </button>
+                            <p class="text-[13px] text-center mt-3.5 text-gray-700 dark:text-gray-400">
+                                Evalúa a todos los empleados para activar
+                            </p>
                         </div>
-                        <div class="w-full h-6 bg-gray-200 rounded-full dark:bg-gray-700 overflow-hidden">
-                          <div id="avance-bar"
-                               class="h-6 bg-blue-600 text-center rounded-full text-white transition-[width] duration-300 ease-in-out"
-                               style="width: {{ $pct }}%;">
-                              {{ $pct }}%
-                          </div>
-                        </div>
-                      </section>
-
-                      {{-- CTA --}}
-                      <div>
-                        <button
-                          id="btn-guardar-evaluacion"
-                          onclick="guardarEvaluacion()"
-                          class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white py-3 px-4 rounded-xl font-semibold transition-all duration-200 transform hover:scale-[1.02] active:scale-95 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                          {{ (count($empleados) - $empleadosEvaluados) > 0 ? 'disabled' : '' }}
-                        >
-                          Guardar Evaluación
-                        </button>
-                        <p class="text-[11px] text-center mt-2 text-gray-500 dark:text-gray-400">
-                          Evalúa a todos los empleados para activar
-                        </p>
-                      </div>
                     </div>
-                  </aside>
-                </div>
+                </aside>
 
                 {{-- Matriz 9-Box --}}
                 <div class="flex-1">
-                    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-4 border border-gray-200 dark:border-gray-700">
-                        <div class="relative w-full mx-auto" style="max-width: 95%;">
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-5 border border-gray-200 dark:border-gray-700">
+                        <div class="relative w-full mx-auto" style="max-width: 96%;">
                             <img 
                                 src="{{ asset('images/9box-demo.png') }}" 
                                 class="w-full h-auto rounded-xl shadow-lg select-none" 
@@ -183,6 +172,7 @@
                         </div>
                     </div>
                 </div>
+                {{-- /flex-row gap-8 --}}
             </div>
         </div>
 
@@ -267,27 +257,65 @@
             --modal-bg-dark:rgba(8,10,20,0.92);
         }
 
-        /* =========================
-           Sidebar "glass" a juego
-           ========================= */
-        .sidebar-card{
-            background: linear-gradient(180deg, rgba(255,255,255,0.64), rgba(255,255,255,0.50));
-            border-radius: 0.85rem;
-            padding: 0.9rem 1rem;
-            box-shadow: 0 10px 28px rgba(2,6,23,0.06);
-            transition: transform .12s ease, box-shadow .12s ease;
+        /* ===== KPIs estilo modal-glass ===== */
+        .kpi-glass{
+          position: relative;
+          padding: 1.1rem 1.1rem;
+          border-radius: .95rem;
+          background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.04));
+          border: 1px solid rgba(255,255,255,0.06);
+          box-shadow: 0 10px 28px rgba(2,6,23,0.20) inset, 0 8px 22px rgba(2,6,23,0.12);
         }
-        .sidebar-card:hover{
-            transform: translateY(-2px);
-            box-shadow: 0 16px 42px rgba(2,6,23,0.09);
+        @media (prefers-color-scheme: light){
+          .kpi-glass{
+            background: linear-gradient(180deg, rgba(15,23,42,0.06), rgba(15,23,42,0.04));
+            border: 1px solid rgba(15,23,42,0.06);
+            box-shadow: 0 10px 28px rgba(2,6,23,0.06) inset, 0 8px 22px rgba(2,6,23,0.08);
+          }
+        }
+        .kpi-row{
+          display: grid;
+          grid-template-columns: 1fr auto;
+          align-items: center;
+          gap: .85rem;
+          padding: 1rem 1.1rem;
+          border-radius: .8rem;
+          background: rgba(2,6,23,0.08);
+        }
+        .kpi-row + .kpi-row{ margin-top: .75rem; }
+        @media (prefers-color-scheme: dark){
+          .kpi-row{ background: rgba(2,6,23,0.18); }
+        }
+        .kpi-label{
+          font-weight: 700;
+          font-size: 1rem;
+          letter-spacing: .2px;
+        }
+        .kpi-value{
+          font-weight: 800;
+          font-size: 2.15rem;
+          line-height: 1;
+          color: #0b1020;
+          letter-spacing: .2px;
         }
         @media (prefers-color-scheme: dark){
-            .sidebar-card{
-                background: linear-gradient(180deg, rgba(15,23,42,0.14), rgba(15,23,42,0.08));
-            }
+          .kpi-value{ color: #e6eef8; text-shadow: 0 1px 0 rgba(0,0,0,.15); }
         }
-        .kpi-number{ font-weight:800; font-size:1.85rem; line-height:1.1; color:#0b1020; }
-        @media (prefers-color-scheme: dark){ .kpi-number{ color:#e6eef8; } }
+        .kpi-brace{
+          position: absolute;
+          top: .6rem;
+          bottom: .6rem;
+          width: .6rem;
+          border-radius: .6rem;
+          background:
+            radial-gradient(12px 8px at 50% 0%, rgba(255,255,255,.20), transparent 60%),
+            radial-gradient(12px 8px at 50% 100%, rgba(255,255,255,.20), transparent 60%),
+            linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.04));
+          opacity: .7;
+          pointer-events: none;
+        }
+        .kpi-brace--left{ left: .45rem; }
+        .kpi-brace--right{ right: .45rem; transform: scaleX(-1); }
 
         /* =========================
            Cuadrantes (botones)
@@ -300,7 +328,6 @@
             transition: transform .18s cubic-bezier(.2,.9,.3,1), box-shadow .18s ease, border-color .12s ease;
             z-index: 40; outline: none;
         }
-        /* FIX: selector válido para el badge dentro del botón */
         .cuadrante-btn .cuadrante-badge{
             background: var(--brand-indigo);
             color: white;
@@ -311,16 +338,12 @@
             box-shadow: 0 4px 14px rgba(2,6,23,0.12);
             user-select: none;
         }
-
         .cuadrante-btn:hover,.cuadrante-btn:focus{
             border-color: rgba(79,70,229,0.95);
             background: linear-gradient(180deg, rgba(79,70,229,0.12), rgba(79,70,229,0.08));
             transform: scale(1.04);
             box-shadow: 0 8px 20px rgba(79,70,229,0.12);
         }
-
-        /* Animación lista */
-        @keyframes slideIn{ from{opacity:0; transform:translateX(-16px);} to{opacity:1; transform:translateX(0);} }
 
         /* Modal wrapper */
         #modal-empleados{ position:fixed; inset:0; z-index:50; display:none; align-items:center; justify-content:center; padding:1rem; }
@@ -362,7 +385,7 @@
             #btn-cerrar-modal:hover{ background:rgba(255,255,255,0.06); }
         }
 
-        /* Lista empleados */
+        /* Listas del modal */
         .lista-empleado{
             padding:.78rem; border-radius:.85rem; display:flex; align-items:center; justify-content:space-between;
             background: linear-gradient(180deg, rgba(255,255,255,0.64), rgba(255,255,255,0.50));
@@ -382,15 +405,32 @@
         @supports not ((-webkit-backdrop-filter: blur(8px)) or (backdrop-filter: blur(8px))){ #modal-backdrop{ background: rgba(6,8,15,0.78);} }
         #ninebox-img{ user-select:none; -webkit-user-select:none; -moz-user-select:none; -ms-user-select:none; }
         .cuadrante-btn:focus-visible, .btn-accion:focus-visible, #btn-cerrar-modal:focus-visible{ outline:3px solid rgba(79,70,229,0.18); outline-offset:3px; }
-        @media (max-width:768px){ #modal-container{ width:calc(100% - 2rem); max-width:36rem; } #modal-title{ font-size:1.8rem; } }
 
-        /* Botones acción (modal) */
-        .btn-accion{ padding:.64rem 1.12rem; font-weight:700; font-size:1rem; border-radius:.75rem; box-shadow:0 8px 18px rgba(2,6,23,0.10);
-            transition: transform .12s ease, box-shadow .12s ease, opacity .12s ease; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:.5rem; }
-        .btn-asignar{ background: linear-gradient(90deg, var(--accent-cyan) 0%, #0e7490 100%); color:#fff; }
-        .btn-asignar:hover{ transform:translateY(-3px); box-shadow:0 14px 34px rgba(8,145,178,0.12); }
-        .btn-eliminar{ background: linear-gradient(90deg, var(--danger-red) 0%, #b91c1c 100%); color:#fff; }
-        .btn-eliminar:hover{ transform:translateY(-3px); box-shadow:0 14px 34px rgba(220,38,38,0.12); }
+        /* Botón acción base */
+        .btn-accion{
+          padding:.75rem 1.15rem; font-weight:700; font-size:1rem; border-radius:.9rem;
+          box-shadow:0 8px 18px rgba(2,6,23,0.10);
+          transition: transform .12s ease, box-shadow .12s ease, opacity .12s ease, filter .12s ease;
+          border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+        }
+
+        /* Botón primario visible en modo claro (y consistente en dark) */
+        #btn-guardar-evaluacion{
+          color:#fff;
+          background-image: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
+          border:1px solid rgba(0,0,0,0.05);
+        }
+        #btn-guardar-evaluacion:hover{ filter: brightness(1.05); }
+        #btn-guardar-evaluacion[disabled]{
+          background-image: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
+          color:#fff;
+          opacity:.78;
+          filter: saturate(.9) grayscale(.06);
+        }
+        @media (prefers-color-scheme: dark){
+          #btn-guardar-evaluacion{ border-color: rgba(255,255,255,0.10); }
+          #btn-guardar-evaluacion[disabled]{ opacity:.9; filter:none; }
+        }
     </style>
 
     {{-- JavaScript --}}
@@ -398,7 +438,6 @@
   // TOKEN CSRF INYECTADO DESDE LARAVEL
   const CSRF_TOKEN = '{{ csrf_token() }}';
 
-  // Log sin parses redundantes
   console.log('asigna', @json($asignacionesActuales));
 
   const cuadrantesData = {
@@ -416,7 +455,6 @@
   let cuadranteActual = null;
   let lastTriggerBtn = null;
 
-  // === Helpers (fuera de DOMContentLoaded) ===
   function getCuadranteButton(id){
     return document.querySelector(`.cuadrante-btn[data-cuadrante="${id}"]`);
   }
@@ -441,10 +479,8 @@
       if(badge) badge.remove();
     }
   }
-  // === Fin helpers ===
 
   document.addEventListener('DOMContentLoaded', () => {
-      // Progreso: ya viene SSR, solo lo reafirmamos
       const bar = document.getElementById('avance-bar');
       const pct = @json($pct);
       if (bar) {
@@ -452,7 +488,6 @@
           bar.textContent = pct + '%';
       }
 
-      // Listeners por botón
       document.querySelectorAll('.cuadrante-btn').forEach(btn => {
           btn.addEventListener('click', function(e) {
               e.preventDefault(); e.stopPropagation();
@@ -462,7 +497,6 @@
           });
       });
 
-      // Modal
       const modalWrapper = document.getElementById('modal-empleados');
       const modalBackdrop = document.getElementById('modal-backdrop');
       const btnCerrar = document.getElementById('btn-cerrar-modal');
@@ -530,7 +564,6 @@
           const result = await response.json();
           renderizarEmpleados(result.asignados || [], result.disponibles || []);
 
-          // >>> ÚNICO añadido necesario para badges dinámicos:
           setBadgeCount(cuadrante, (result.asignados || []).length);
 
           const modal = document.getElementById('modal-empleados');
@@ -655,7 +688,6 @@
           await response.json();
           await mostrarModal(cuadranteActual);
           await actualizarEstadisticas(true);
-          // (badge se sincroniza en mostrarModal)
       }catch(error){
           console.error('Error fetch asignar:', error);
           alert('Error al asignar empleado: ' + error.message);
@@ -685,7 +717,6 @@
           const result = await response.json();
           await mostrarModal(cuadranteActual);
           await actualizarEstadisticas(false);
-          // (badge se sincroniza en mostrarModal)
       }catch(error){
           console.error('Error fetch eliminar:', error);
           alert('Error al eliminar asignación: ' + error.message);
