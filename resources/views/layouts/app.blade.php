@@ -41,7 +41,10 @@
             </main>
         </div>
 
-        <!-- Modal global reutilizable (una sola instancia en toda la app) -->
-        <x-empleados-modal />
+        <!-- Lugar opcional para modales inyectados desde las vistas -->
+        @stack('modals')
+
+        <!-- Stack opcional para scripts por-vista -->
+        @stack('scripts')
     </body>
 </html>
