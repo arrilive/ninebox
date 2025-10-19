@@ -17,13 +17,9 @@ class Rendimiento extends Model
     protected $fillable = [
         'usuario_id',
         'ninebox_id',
-        'fecha',
         'comentario',
     ];
 
-    protected $casts = [
-        'fecha' => 'date',
-    ];
 
     // Relación con usuario
     public function usuario()

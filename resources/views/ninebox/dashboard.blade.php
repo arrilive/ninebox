@@ -24,22 +24,61 @@
 
           {{-- Cuerpo --}}
           <div class="p-7 space-y-7">
+
+            <section aria-label="Filtro de Fecha por año y mes"
+         class="flex flex-wrap items-center gap-3 mb-6">
+  {{-- Selector de año --}}
+  <div>
+    <label for="filtro-anio" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+      Año
+    </label>
+    <select id="filtro-anio"
+            x-model="anioSeleccionado"
+            class="rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900/70 dark:text-gray-200
+                   focus:border-indigo-500 focus:ring-indigo-500">
+      @for ($i = now()->year; $i >= 2020; $i--)
+        <option value="{{ $i }}">{{ $i }}</option>
+      @endfor
+    </select>
+  </div>
+
+  {{-- Selector de mes --}}
+  <div>
+    <label for="filtro-mes" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+      Mes
+    </label>
+    <select id="filtro-mes"
+            x-model="mesSeleccionado"
+            class="rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900/70 dark:text-gray-200
+                   focus:border-indigo-500 focus:ring-indigo-500">
+      @foreach ([
+        1=>'Enero',2=>'Febrero',3=>'Marzo',4=>'Abril',5=>'Mayo',6=>'Junio',
+        7=>'Julio',8=>'Agosto',9=>'Septiembre',10=>'Octubre',11=>'Noviembre',12=>'Diciembre'
+      ] as $num => $mes)
+        <option value="{{ $num }}">{{ $mes }}</option>
+      @endforeach
+    </select>
+  </div>
+
+  {{-- Botón de aplicar --}}
+  <button id="btn-aplicar-filtro-fecha" onclick="filtrarPorFecha()"
+          class="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold
+                 hover:opacity-90 shadow-lg transition">
+    Aplicar
+  </button>
+  
+</section>
             {{-- KPIs (bloque único estilo modal-glass) --}}
             <section aria-label="Indicadores clave">
               <div class="kpi-glass">
-                <div class="kpi-brace kpi-brace--left" aria-hidden="true"></div>
-                <div class="kpi-brace kpi-brace--right" aria-hidden="true"></div>
-
                 <div class="kpi-row">
                   <span class="kpi-label text-gray-900 dark:text-gray-100">Total Empleados</span>
                   <span id="total-empleados" class="kpi-value">{{ $total }}</span>
                 </div>
-
                 <div class="kpi-row">
                   <span class="kpi-label text-emerald-600 dark:text-emerald-400">Evaluados</span>
                   <span id="empleados-evaluados" class="kpi-value">{{ $empleadosEvaluados }}</span>
                 </div>
-
                 <div class="kpi-row">
                   <span class="kpi-label text-rose-600 dark:text-red-400">Por Evaluar</span>
                   <span id="empleados-pendientes" class="kpi-value">{{ $pendientes }}</span>
@@ -104,48 +143,49 @@
 
               {{-- Botones sobre cada cuadrante --}}
               <button type="button" class="cuadrante-btn btn-surface" style="position:absolute; left: 17.5%; top:18%; width:23.5%; height:25%;" data-cuadrante="1" title="Diamante en bruto" aria-label="Ver empleados en Diamante en bruto">
-                @if(($asignacionesActuales[1] ?? 0) > 0)
-                  <div class="cuadrante-badge">{{ $asignacionesActuales[1] }}</div>
+                @if(($asignacionesActuales->get(1, collect())->count()) > 0)
+                  <div class="cuadrante-badge">{{ ($asignacionesActuales->get(1, collect())->count()) }}</div>
                 @endif
               </button>
+              
               <button type="button" class="cuadrante-btn btn-surface" style="position:absolute; left:42.5%; top:18%; width:23.5%; height:25%;" data-cuadrante="2" title="Estrella en desarrollo" aria-label="Ver empleados en Estrella en desarrollo">
-                @if(($asignacionesActuales[2] ?? 0) > 0)
-                  <div class="cuadrante-badge">{{ $asignacionesActuales[2] }}</div>
+                @if(($asignacionesActuales->get(2, collect())->count()) > 0)
+                  <div class="cuadrante-badge">{{ ($asignacionesActuales->get(2, collect())->count()) }}</div>
                 @endif
               </button>
               <button type="button" class="cuadrante-btn btn-surface" style="position:absolute; left:67.5%; top:18%; width:23%; height:25%;" data-cuadrante="3" title="Estrella" aria-label="Ver empleados en Estrella">
-                @if(($asignacionesActuales[3] ?? 0) > 0)
-                  <div class="cuadrante-badge">{{ $asignacionesActuales[3] }}</div>
+                @if(($asignacionesActuales->get(3, collect())->count()) > 0)
+                  <div class="cuadrante-badge">{{ ($asignacionesActuales->get(3, collect())->count()) }}</div>
                 @endif
               </button>
               <button type="button" class="cuadrante-btn btn-surface" style="position:absolute; left: 17.5%; top:45%; width:23.5%; height:25%;" data-cuadrante="4" title="Mal empleado" aria-label="Ver empleados en Mal empleado">
-                @if(($asignacionesActuales[4] ?? 0) > 0)
-                  <div class="cuadrante-badge">{{ $asignacionesActuales[4] }}</div>
+                @if(($asignacionesActuales->get(4, collect())->count()) > 0)
+                  <div class="cuadrante-badge">{{ ($asignacionesActuales->get(4, collect())->count()) }}</div>
                 @endif
               </button>
               <button type="button" class="cuadrante-btn btn-surface" style="position:absolute; left:42.5%; top:45%; width:23.5%; height:25%;" data-cuadrante="5" title="Personal sólido" aria-label="Ver empleados en Personal sólido">
-                @if(($asignacionesActuales[5] ?? 0) > 0)
-                  <div class="cuadrante-badge">{{ $asignacionesActuales[5] }}</div>
+                @if(($asignacionesActuales->get(5, collect())->count()) > 0)
+                  <div class="cuadrante-badge">{{ ($asignacionesActuales->get(5, collect())->count()) }}</div>
                 @endif
               </button>
               <button type="button" class="cuadrante-btn btn-surface" style="position:absolute; left:67.5%; top:45%; width:23%; height:25%;" data-cuadrante="6" title="Elemento importante" aria-label="Ver empleados en Elemento importante">
-                @if(($asignacionesActuales[6] ?? 0) > 0)
-                  <div class="cuadrante-badge">{{ $asignacionesActuales[6] }}</div>
+                @if(($asignacionesActuales->get(6, collect())->count()) > 0)
+                  <div class="cuadrante-badge">{{ ($asignacionesActuales->get(6, collect())->count()) }}</div>
                 @endif
               </button>
               <button type="button" class="cuadrante-btn btn-surface" style="position:absolute; left: 17.5%; top:72%; width:23.5%; height:25%;" data-cuadrante="7" title="Inaceptable" aria-label="Ver empleados en Inaceptable">
-                @if(($asignacionesActuales[7] ?? 0) > 0)
-                  <div class="cuadrante-badge">{{ $asignacionesActuales[7] }}</div>
+                @if(($asignacionesActuales->get(7, collect())->count()) > 0)
+                  <div class="cuadrante-badge">{{ ($asignacionesActuales->get(7, collect())->count()) }}</div>
                 @endif
               </button>
               <button type="button" class="cuadrante-btn btn-surface" style="position:absolute; left:42.5%; top:72%; width:23.5%; height:25%;" data-cuadrante="8" title="Aceptable" aria-label="Ver empleados en Aceptable">
-                @if(($asignacionesActuales[8] ?? 0) > 0)
-                  <div class="cuadrante-badge">{{ $asignacionesActuales[8] }}</div>
+                @if(($asignacionesActuales->get(8, collect())->count()) > 0)
+                  <div class="cuadrante-badge">{{ ($asignacionesActuales->get(8, collect())->count()) }}</div>
                 @endif
               </button>
               <button type="button" class="cuadrante-btn btn-surface" style="position:absolute; left:67.5%; top:72%; width:23%; height:25%;" data-cuadrante="9" title="Personal clave" aria-label="Ver empleados en Personal clave">
-                @if(($asignacionesActuales[9] ?? 0) > 0)
-                  <div class="cuadrante-badge">{{ $asignacionesActuales[9] }}</div>
+                @if(($asignacionesActuales->get(9, collect())->count()) > 0)
+                  <div class="cuadrante-badge">{{ ($asignacionesActuales->get(9, collect())->count()) }}</div>
                 @endif
               </button>
             </div>
@@ -469,8 +509,12 @@
   <script>
     // TOKEN CSRF INYECTADO DESDE LARAVEL
     const CSRF_TOKEN = '{{ csrf_token() }}';
-
-    console.log('asigna', @json($asignacionesActuales));
+    const asignacionesActuales = @json($asignacionesActuales);
+    let rendimientosAsignados = !Array.isArray(asignacionesActuales) ? asignacionesActuales : {};
+    const empleados = @json($empleados) || [];
+    console.log('Rendimientos asignados:', rendimientosAsignados);
+    let cuadranteActual = null;
+    let lastTriggerBtn = null;
 
     const cuadrantesData = {
       1: { title: "Diamante en bruto", subtitle: "Alto Potencial - Bajo Desempeño", desc: "Gran potencial, su desempeño no ha sido exigido por lo que requiere desarrollarlo" },
@@ -483,41 +527,6 @@
       8: { title: "Aceptable", subtitle: "Bajo Potencial - Medio Desempeño", desc: "Desempeño básico, cumple con los mínimos requerimientos" },
       9: { title: "Personal clave", subtitle: "Bajo Potencial - Alto Desempeño", desc: "Empleados confiables con buen desempeño, pero con poco potencial de desarrollo" }
     };
-
-    let cuadranteActual = null;
-    let lastTriggerBtn = null;
-
-    function getCuadranteButton(id){
-      return document.querySelector(`.cuadrante-btn[data-cuadrante="${id}"]`);
-    }
-
-    // === Badge animado y consistente con el botón ===
-    function setBadgeCount(cuadranteId, count){
-      const btn = getCuadranteButton(cuadranteId);
-      if(!btn) return;
-
-      let badge = btn.querySelector('.cuadrante-badge');
-
-      if(count > 0){
-        if(!badge){
-          badge = document.createElement('div');
-          badge.className = 'cuadrante-badge';
-          btn.appendChild(badge);
-        }
-        const old = badge.textContent;
-        badge.textContent = String(count);
-
-        if (old !== String(count)) {
-          badge.classList.remove('bump');
-          // reflow para reiniciar la animación
-          // eslint-disable-next-line no-unused-expressions
-          badge.offsetWidth;
-          badge.classList.add('bump');
-        }
-      }else{
-        if(badge) badge.remove();
-      }
-    }
 
     document.addEventListener('DOMContentLoaded', () => {
       const bar = document.getElementById('avance-bar');
@@ -557,8 +566,36 @@
       if (img) img.addEventListener('contextmenu', (e) => { e.preventDefault(); return false; });
     });
 
+    // === Badge animado y consistente con el botón ===
+    function setBadgeCount(cuadranteId, count){
+      const btn = document.querySelector(`.cuadrante-btn[data-cuadrante="${cuadranteId}"]`);
+      if(!btn) return;
+
+      let badge = btn.querySelector('.cuadrante-badge');
+
+      if(count > 0){
+        if(!badge){
+          badge = document.createElement('div');
+          badge.className = 'cuadrante-badge';
+          btn.appendChild(badge);
+        }
+        const old = badge.textContent;
+        badge.textContent = String(count);
+
+        if (old !== String(count)) {
+          badge.classList.remove('bump');
+          // reflow para reiniciar la animación
+          // eslint-disable-next-line no-unused-expressions
+          badge.offsetWidth;
+          badge.classList.add('bump');
+        }
+      }else{
+        if(badge) badge.remove();
+      }
+    }
+
     // === Modal con entrada/salida suave (clase .show) ===
-    async function mostrarModal(cuadrante){
+    function mostrarModal(cuadrante){
       cuadranteActual = cuadrante;
       const data = cuadrantesData[cuadrante] || { title:'Cuadrante', subtitle:'', desc:'' };
       const titleEl = document.getElementById('modal-title');
@@ -571,32 +608,12 @@
       if (countA) countA.textContent = '0';
       if (countD) countD.textContent = '0';
 
-      try{
-        const url = `/jefe/cuadrante/${encodeURIComponent(cuadrante)}/empleados`;
-        const response = await fetch(url, {
-          method:'GET',
-          headers:{ 'Accept':'application/json', 'X-CSRF-TOKEN': CSRF_TOKEN },
-          credentials:'same-origin'
-        });
-        if(!response.ok){
-          const errorText = await response.text();
-          console.error('Error del servidor:', errorText);
-          alert(`Error al cargar empleados (código ${response.status})`);
-          return;
-        }
-        const result = await response.json();
-        renderizarEmpleados(result.asignados || [], result.disponibles || []);
-        setBadgeCount(cuadrante, (result.asignados || []).length);
-
-        const modal = document.getElementById('modal-empleados');
-        if (modal){
-          modal.classList.remove('hidden');
-          requestAnimationFrame(() => modal.classList.add('show'));
-        }
-      }catch(error){
-        console.error('Error fetch empleados:', error);
-        alert('Error al cargar empleados: ' + error.message);
+      const modal = document.getElementById('modal-empleados');
+      if (modal){
+        modal.classList.remove('hidden');
+        requestAnimationFrame(() => modal.classList.add('show'));
       }
+      actualizarListasEmpleados();
     }
 
     function cerrarModal(){
@@ -613,145 +630,33 @@
         }
       }, 220);
     }
-
-    // === Render de listas con botones armonizados ===
-    function renderizarEmpleados(asignados, disponibles){
-      const listaAsignados = document.getElementById('lista-asignados');
-      const listaDisponibles = document.getElementById('lista-disponibles');
-      const emptyAsignados = document.getElementById('empty-asignados');
-      const emptyDisponibles = document.getElementById('empty-disponibles');
-
-      const countA = document.getElementById('count-asignados');
-      const countD = document.getElementById('count-disponibles');
-      if (countA) countA.textContent = asignados.length;
-      if (countD) countD.textContent = disponibles.length;
-
-      if (listaAsignados) listaAsignados.innerHTML = '';
-      if (asignados.length > 0){
-        if (emptyAsignados) emptyAsignados.classList.add('hidden');
-        asignados.forEach((emp, index) => {
-          const li = document.createElement('li');
-          li.className = 'lista-empleado flex items-center justify-between border-l-4 border-green-500';
-          li.style.animation = `slideIn 0.32s ease-out ${index * 0.05}s both`;
-
-          const left = document.createElement('div');
-          left.className = 'flex items-center gap-3';
-
-          const icon = document.createElement('div');
-          icon.className = 'avatar-icon';
-          icon.innerHTML = `<svg class="w-5 h-5 text-gray-700 dark:text-gray-200" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a5 5 0 100-10 5 5 0 000 10zM2 18a8 8 0 0116 0H2z"/></svg>`;
-
-          const name = document.createElement('span');
-          name.className = 'font-semibold text-gray-900 dark:text-white nombre-empleado';
-          name.textContent = `${emp.apellido_paterno||''} ${emp.apellido_materno||''}`;
-
-          left.appendChild(icon);
-          left.appendChild(name);
-
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.dataset.id = emp.id;
-          btn.className = 'btn btn-danger btn-sm eliminar-btn';
-          btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3m-4 0h14"/></svg><span class="sr-only">Eliminar</span>`;
-          btn.addEventListener('click', (e) => { e.stopPropagation(); eliminarEmpleado(emp.id); });
-
-          li.appendChild(left);
-          li.appendChild(btn);
-          if (listaAsignados) listaAsignados.appendChild(li);
-        });
-      }else{
-        if (emptyAsignados) emptyAsignados.classList.remove('hidden');
-      }
-
-      if (listaDisponibles) listaDisponibles.innerHTML = '';
-      if (disponibles.length > 0){
-        if (emptyDisponibles) emptyDisponibles.classList.add('hidden');
-        disponibles.forEach((emp, index) => {
-          const li = document.createElement('li');
-          li.className = 'lista-empleado flex items-center justify-between border-l-4 border-blue-500';
-          li.style.animation = `slideIn 0.32s ease-out ${index * 0.05}s both`;
-
-          const left = document.createElement('div');
-          left.className = 'flex items-center gap-3';
-
-          const icon = document.createElement('div');
-          icon.className = 'avatar-icon';
-          icon.innerHTML = `<svg class="w-5 h-5 text-gray-700 dark:text-gray-200" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a5 5 0 100-10 5 5 0 000 10zM2 18a8 8 0 0116 0H2z"/></svg>`;
-
-          const name = document.createElement('span');
-          name.className = 'font-semibold text-gray-900 dark:text-white nombre-empleado';
-          name.textContent = `${emp.apellido_paterno||''} ${emp.apellido_materno||''}`;
-
-          left.appendChild(icon);
-          left.appendChild(name);
-
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.dataset.id = emp.id;
-          btn.className = 'btn btn-primary btn-sm asignar-btn';
-          btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span class="sr-only">Asignar</span>`;
-          btn.addEventListener('click', (e) => { e.stopPropagation(); asignarEmpleado(emp.id); });
-
-          li.appendChild(left);
-          li.appendChild(btn);
-          if (listaDisponibles) listaDisponibles.appendChild(li);
-        });
-      }else{
-        if (emptyDisponibles) emptyDisponibles.classList.remove('hidden');
-      }
-    }
-
-    async function asignarEmpleado(usuarioId){
+      
+    function asignarEmpleado(usuarioId){
       try{
-        const formData = new FormData();
-        formData.append('usuario_id', parseInt(usuarioId));
-        formData.append('ninebox_id', parseInt(cuadranteActual));
-        formData.append('_token', CSRF_TOKEN);
-
-        const response = await fetch('/jefe/asignar-empleado', {
-          method:'POST',
-          headers:{ 'Accept':'application/json', 'X-Requested-With':'XMLHttpRequest' },
-          credentials:'same-origin',
-          body: formData
-        });
-        if(!response.ok){
-          const errorText = await response.text();
-          console.error('Error al asignar:', errorText);
-          alert('Error al asignar empleado (código ' + response.status + ')');
-          return;
+        if(rendimientosAsignados[cuadranteActual] === undefined){
+          rendimientosAsignados[cuadranteActual] = [];
         }
-        await response.json();
-        await mostrarModal(cuadranteActual);
-        await actualizarEstadisticas(true);
+        const rendimientos = rendimientosAsignados[cuadranteActual];
+        if(rendimientos.find(rendimiento => rendimiento.usuario_id === parseInt(usuarioId))) return;
+        rendimientos.push({ usuario_id: parseInt(usuarioId), ninebox_id: parseInt(cuadranteActual) });
+        actualizarEstadisticas();
       }catch(error){
         console.error('Error fetch asignar:', error);
         alert('Error al asignar empleado: ' + error.message);
       }
     }
 
-    async function eliminarEmpleado(usuarioId){
+    function eliminarEmpleado(usuarioId){
       if(!confirm('¿Eliminar esta asignación?')) return;
       try{
-        const response = await fetch('/jefe/eliminar-asignacion', {
-          method:'POST',
-          headers:{
-            'Content-Type':'application/json',
-            'X-CSRF-TOKEN': CSRF_TOKEN,
-            'Accept':'application/json',
-            'X-Requested-With':'XMLHttpRequest'
-          },
-          credentials:'same-origin',
-          body: JSON.stringify({ usuario_id: parseInt(usuarioId), ninebox_id: parseInt(cuadranteActual) })
-        });
-        if(!response.ok){
-          const errorText = await response.text();
-          console.error('Error al eliminar:', errorText);
-          alert(`Error al eliminar asignación (código ${response.status})`);
-          return;
+        if(rendimientosAsignados[cuadranteActual] === undefined){
+          rendimientosAsignados[cuadranteActual] = [];
         }
-        await response.json();
-        await mostrarModal(cuadranteActual);
-        await actualizarEstadisticas(false);
+        const rendimientos = rendimientosAsignados[cuadranteActual];
+        if(!rendimientos.find(rendimiento => rendimiento.usuario_id === parseInt(usuarioId))) return;
+        rendimientos?.splice(rendimientos?.findIndex(rendimiento => rendimiento.usuario_id === parseInt(usuarioId)), 1);
+        console.log('rendimientosAsignados', rendimientosAsignados);
+        actualizarEstadisticas(false);
       }catch(error){
         console.error('Error fetch eliminar:', error);
         alert('Error al eliminar asignación: ' + error.message);
@@ -766,7 +671,8 @@
 
         const total = parseInt(elTotal?.textContent || '0');
         const evaluados = parseInt(elEval?.textContent || '0');
-        const actualEvaluados = aumentar ? evaluados + 1 : Math.max(0, evaluados - 1);
+        const countEvaluados= aumentar ? evaluados + 1 : Math.max(0, evaluados - 1);
+        const actualEvaluados = countEvaluados > total ? total : countEvaluados;
         const pendientes = Math.max(0, total - actualEvaluados);
 
         if (elTotal) elTotal.textContent = total;
@@ -785,13 +691,167 @@
           const habilitar = pendientes === 0 && total > 0;
           btn.disabled = !habilitar;
         }
+        actualizarListasEmpleados();
       }catch(err){
         console.log('Ocurrió un error', err);
       }
     }
 
-    function guardarEvaluacion(){
-      alert('Guardar evaluación (implementa la lógica en esta función según tu backend).');
+    function crearListaEmpleados(elemLista, listaEmpty, empleados, esAsignados){
+      if (elemLista) elemLista.innerHTML = '';
+      if (empleados.length > 0){
+        if (listaEmpty) listaEmpty.classList.add('hidden');
+        empleados.forEach((emp, index) => {
+          const li = document.createElement('li');
+          li.className = 'lista-empleado flex items-center justify-between border-l-4 border-green-500';
+          li.style.animation = `slideIn 0.32s ease-out ${index * 0.05}s both`;
+
+          const left = document.createElement('div');
+          left.className = 'flex items-center gap-3';
+
+          const icon = document.createElement('div');
+          icon.className = 'avatar-icon';
+          icon.innerHTML = `<svg class="w-5 h-5 text-gray-700 dark:text-gray-200" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a5 5 0 100-10 5 5 0 000 10zM2 18a8 8 0 0116 0H2z"/></svg>`;
+
+          const name = document.createElement('span');
+          name.className = 'font-semibold text-gray-900 dark:text-white nombre-empleado';
+          name.textContent = `${emp.nombre||''} ${emp.apellido_paterno||''} ${emp.apellido_materno||''}`;
+
+          left.appendChild(icon);
+          left.appendChild(name);
+
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.dataset.id = emp.id;
+
+          if(esAsignados){
+            btn.className = 'btn btn-danger btn-sm eliminar-btn';
+            btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3m-4 0h14"/></svg><span class="sr-only">Eliminar</span>`;
+            btn.addEventListener('click', (e) => { e.stopPropagation(); eliminarEmpleado(emp.id); });
+          }else{
+            btn.className = 'btn btn-primary btn-sm asignar-btn';
+            btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span class="sr-only">Asignar</span>`;
+            btn.addEventListener('click', (e) => { e.stopPropagation(); asignarEmpleado(emp.id); });
+          }
+
+          li.appendChild(left);
+          li.appendChild(btn);
+          if (elemLista) elemLista.appendChild(li);
+        });
+      }else{
+        if (listaEmpty) listaEmpty.classList.remove('hidden');
+      }
+    }
+
+       // === Render de listas con botones armonizados ===
+    function renderizarEmpleados(asignados, disponibles){
+      const elemListaAsignados = document.getElementById('lista-asignados');
+      const elemListaDisponibles = document.getElementById('lista-disponibles');
+      const emptyAsignados = document.getElementById('empty-asignados');
+      const emptyDisponibles = document.getElementById('empty-disponibles');
+      const countA = document.getElementById('count-asignados');
+      const countD = document.getElementById('count-disponibles');
+
+      if (countA) countA.textContent = asignados.length;
+      if (countD) countD.textContent = disponibles.length;
+
+      crearListaEmpleados(elemListaAsignados, emptyAsignados, asignados, true);
+      crearListaEmpleados(elemListaDisponibles, emptyDisponibles, disponibles, false);
+    }
+
+    function actualizarListasEmpleados() {
+      const idsEmpleadosAsignadosCuadrante = (rendimientosAsignados[cuadranteActual] ?? [])
+      .map(rendimiento => rendimiento.usuario_id);
+
+      const empleadosAsignados = empleados.filter(emp =>
+        idsEmpleadosAsignadosCuadrante.includes(emp.id)
+      );
+
+      const idsEmpleadosAsignadosTotales = Object
+        .values(rendimientosAsignados ?? {})
+        .flatMap(arr => (Array.isArray(arr) ? arr : []))
+        .map(rendimiento => rendimiento.usuario_id);
+
+      const empleadosDisponibles = empleados.filter(
+        emp => !idsEmpleadosAsignadosTotales.includes(emp.id)
+      );
+
+      renderizarEmpleados(empleadosAsignados, empleadosDisponibles);
+      setBadgeCount(cuadranteActual, empleadosAsignados.length);
+    }
+
+
+    async function guardarEvaluacion(){
+      try{
+        const anio = document.getElementById('filtro-anio').value;
+        const mes = document.getElementById('filtro-mes').value;
+        const formData = new FormData();
+        formData.append('anio', anio);
+        formData.append('mes', mes);
+        formData.append('rendimientosAsignados', JSON.stringify(rendimientosAsignados));
+        formData.append('_token', CSRF_TOKEN);
+
+        const response = await fetch('/ninebox/guardar-evaluacion', {
+          method: 'POST',
+          headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin',
+          body: formData
+        });
+
+        if(!response.ok){
+          const errorText = await response.text();
+          console.error('Error al guardar evaluación:', errorText);
+          alert('Error al guardar evaluación (código ' + response.status + ')');
+          return;
+        }
+
+        await response.json();
+        alert('Evaluación guardada con éxito');
+      }catch(error){
+        console.error('Error fetch guardar evaluación:', error);
+        alert('Error al guardar evaluación: ' + error.message);
+      }
+    }
+
+    function recalcularBadges(){
+      for (let i = 1; i <= 9; i++) {
+        const lista = rendimientosAsignados[String(i)] ?? [];
+        setBadgeCount(i, Array.isArray(lista) ? lista.length : 0);
+      }
+    }
+
+    async function filtrarPorFecha(){
+      try{
+        console.log('aplicar');
+        const anio = document.getElementById('filtro-anio').value;
+        const mes = document.getElementById('filtro-mes').value;
+        
+        const formData = new FormData();
+        formData.append('anio', anio);
+        formData.append('mes', mes);
+        formData.append('_token', CSRF_TOKEN);
+
+        const response = await fetch('/ninebox/filtrar-rendimientos', {
+          method: 'POST',
+          headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin',
+          body: formData
+        });
+        if(!response.ok){
+          const errorText = await response.text();
+          console.error('Error al filtrar evaluación:', errorText);
+          alert('Error al guardar evaluación (código ' + response.status + ')');
+          return;
+        }
+        const data = await response.json(); // <- aquí parseas el cuerpo JSON
+        rendimientosAsignados = !Array.isArray(data?.asignacionesPorFecha) ? data?.asignacionesPorFecha : {};
+        console.log('rednimientosAsig', rendimientosAsignados);
+        recalcularBadges();
+        actualizarEstadisticas();
+      }catch(error){
+        console.error('Error fetch filtrar evaluación:', error);
+        alert('Error al filtrar evaluación: ' + error.message);
+      }
     }
   </script>
 </x-app-layout>

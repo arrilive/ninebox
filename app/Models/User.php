@@ -103,7 +103,7 @@ class User extends Authenticatable
     public function evaluacionActual()
     {
         return $this->hasOne(Rendimiento::class, 'usuario_id')
-                    ->whereDate('fecha', today())
+                    ->whereDate('created_at', today())
                     ->with('nineBox');
     }
 }

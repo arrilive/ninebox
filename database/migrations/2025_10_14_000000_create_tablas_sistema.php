@@ -54,6 +54,7 @@ return new class extends Migration {
             $table->string('user_name', 60)->nullable()->unique();
             $table->string('password', 255)->nullable();
             $table->string('correo', 150)->nullable()->unique();
+            $table->string('nombre', 100);
             $table->string('apellido_paterno', 100)->nullable();
             $table->string('apellido_materno', 100)->nullable();
             $table->string('telefono', 20)->nullable();
@@ -71,12 +72,10 @@ return new class extends Migration {
         Schema::create('rendimientos', function (Blueprint $table) {
             $table->unsignedInteger('usuario_id');
             $table->unsignedInteger('ninebox_id');
-            $table->date('fecha');
             $table->text('comentario')->nullable();
             $table->timestamp('created_at')->useCurrent();
 
-            // primary key compuesta (usuario_id, fecha) para garantizar que un usuario solo tenga un registro por fecha
-            $table->primary(['usuario_id', 'fecha']);
+            $table->primary(['usuario_id', 'created_at']);
 
             $table->foreign('usuario_id')->references('id')->on('usuarios')->onDelete('cascade')->onUpdate('cascade');
             $table->foreign('ninebox_id')->references('id')->on('nine_box')->onDelete('restrict')->onUpdate('cascade');

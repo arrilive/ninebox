@@ -49,20 +49,19 @@
     .menu-item:hover{ background:rgba(99,102,241,.10); }
     .menu-sep{ height:1px; width:100%; background:rgba(15,23,42,.08); }
 
-    /* ===== Dark mode (mismos colores que veníamos usando) ===== */
+    /* ===== Dark mode ===== */
     @media (prefers-color-scheme: dark){
       .pill{
         background:rgba(31,41,55,.70);
         color:#f8fafc;
         border-color:rgba(255,255,255,.12);
       }
-      .pill-muted{ color:#dbeafe; opacity:.86; } /* sutilmente más clara */
+      .pill-muted{ color:#dbeafe; opacity:.86; }
       .btn-ghost{
         background:rgba(255,255,255,.06);
         border-color:rgba(255,255,255,.10);
         color:#f8fafc;
       }
-
       .dropdown-panel{
         background:rgba(17,24,39,.92);
         border-color:rgba(255,255,255,.06);
@@ -70,12 +69,10 @@
         color:#ffffff;
       }
       .menu-item,
-      .menu-item *{ color:#ffffff; }           /* texto blanco */
-      .menu-item svg{ fill:currentColor; }     /* íconos blancos */
+      .menu-item *{ color:#ffffff; }
+      .menu-item svg{ fill:currentColor; }
       .menu-item:hover{ background:rgba(99,102,241,.18); }
       .menu-sep{ background:rgba(255,255,255,.08); }
-
-      /* móvil: asegúrate que el bloque herede color claro */
       .mobile-wrap{ color:#ffffff; }
       .mobile-wrap .pill-muted{ color:#dbeafe; opacity:.86; }
     }
@@ -87,7 +84,7 @@
     <div class="hidden md:flex items-center justify-between h-20">
       {{-- LEFT --}}
       <div class="flex items-center gap-6">
-        <a href="{{ route('jefe.dashboard') }}" class="shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900">
+        <a href="{{ route('ninebox.dashboard') }}" class="shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900">
           <img src="{{ asset('images/BPT-LOGO.png') }}" alt="BPT Logo" class="block h-11 w-auto" />
         </a>
 
@@ -135,13 +132,17 @@
                 Perfil
               </a>
               <div class="menu-sep my-1"></div>
-              <form method="POST" action="{{ route('logout') }}">
+
+              {{-- === Logout robusto (desktop): botón → form oculto === --}}
+              @php $logoutUrl = route('logout'); @endphp
+              <form id="logout-form-desktop" method="POST" action="{{ $logoutUrl }}" class="hidden">
                 @csrf
-                <button type="submit" class="menu-item" role="menuitem">
-                  <svg viewBox="0 0 24 24"><path d="M16 13v-2H7V8l-5 4 5 4v-3h9zM20 3h-8a2 2 0 00-2 2v3h2V5h8v14h-8v-3h-2v3a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2z"/></svg>
-                  Cerrar sesión
-                </button>
               </form>
+              <button type="button" class="menu-item" role="menuitem"
+                @click.prevent="accOpen = false; $nextTick(() => { document.getElementById('logout-form-desktop').submit(); });">
+                <svg viewBox="0 0 24 24"><path d="M16 13v-2H7V8l-5 4 5 4v-3h9zM20 3h-8a2 2 0 00-2 2v3h2V5h8v14h-8v-3h-2v3a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2z"/></svg>
+                Cerrar sesión
+              </button>
             </div>
           </div>
         </div>
@@ -151,7 +152,7 @@
     {{-- ========= MOBILE < md ========= --}}
     <div class="flex md:hidden items-center justify-between py-2">
       <div class="flex items-center gap-3 min-w-0">
-        <a href="{{ route('jefe.dashboard') }}" class="shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900">
+        <a href="{{ route('ninebox.dashboard') }}" class="shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900">
           <img src="{{ asset('images/BPT-LOGO.png') }}" alt="BPT Logo" class="block h-9 w-auto" />
         </a>
         <span class="pill text-[0.95rem] select-none">
@@ -191,10 +192,16 @@
       <div class="pt-3 pb-4 border-t border-gray-200 dark:border-gray-800">
         <div class="mt-1 space-y-1 px-2">
           <a href="{{ route('profile.edit') }}" class="menu-item" role="menuitem">Perfil</a>
-          <form method="POST" action="{{ route('logout') }}" class="px-0">
+
+          {{-- === Logout robusto (mobile): botón → form oculto === --}}
+          @php $logoutUrl = route('logout'); @endphp
+          <form id="logout-form-mobile" method="POST" action="{{ $logoutUrl }}" class="hidden">
             @csrf
-            <button type="submit" class="menu-item" role="menuitem">Cerrar sesión</button>
           </form>
+          <button type="button" class="menu-item w-full text-left"
+                  @click.prevent="open = false; $nextTick(() => { document.getElementById('logout-form-mobile').submit(); });">
+            Cerrar sesión
+          </button>
         </div>
       </div>
     </div>
