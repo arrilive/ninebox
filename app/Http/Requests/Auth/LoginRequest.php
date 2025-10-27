@@ -1,11 +1,11 @@
 <?php
+
 namespace App\Http\Requests\Auth;
 
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class LoginRequest extends FormRequest
@@ -18,7 +18,7 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'correo' => ['required', 'string', 'email'],  
+            'correo'   => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
         ];
     }
@@ -27,12 +27,17 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        // usa 'correo' en lugar de 'email'
-        if (! Auth::attempt(['correo' => $this->correo, 'password' => $this->password], $this->boolean('remember'))) {
+        // Autenticar contra la columna real de tu tabla: 'correo'
+        $credentials = [
+            'correo'   => (string) $this->input('correo'),
+            'password' => (string) $this->input('password'),
+        ];
+
+        if (! Auth::attempt($credentials, $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'correo' => trans('auth.failed'),  
+                'correo' => trans('auth.failed'),
             ]);
         }
 
@@ -50,15 +55,15 @@ class LoginRequest extends FormRequest
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'correo' => trans('auth.throttle', [  
+            'correo' => trans('auth.throttle', [
                 'seconds' => $seconds,
-                'minutes' => ceil($seconds / 60),
+                'minutes' => (int) ceil($seconds / 60),
             ]),
         ]);
     }
 
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('correo')).'|'.$this->ip());  
+        return strtolower((string) $this->input('correo')).'|'.$this->ip();
     }
 }

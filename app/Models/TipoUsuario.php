@@ -12,6 +12,12 @@ class TipoUsuario extends Model
         'descripcion',
     ];
 
+    const TIPOS_USUARIO = [
+        'admin' => 1,
+        'jefe' => 2,
+        'empleado' => 3,
+    ];
+
     public function usuarios()
     {
         return $this->hasMany(User::class, 'tipo_usuario_id');

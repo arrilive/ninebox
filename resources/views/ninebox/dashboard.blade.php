@@ -4,9 +4,9 @@
       <div class="flex flex-col lg:flex-row gap-8">
         {{-- Sidebar resumen (look & feel como el modal) --}}
         @php
-          $total = max(1, count($empleados));
+          $total = count($empleados);
           $pendientes = max(0, $total - $empleadosEvaluados);
-          $pct = min(100, round(($empleadosEvaluados / $total) * 100));
+          $pct = $total > 0 ? min(100, round(($empleadosEvaluados / $total) * 100)) : 0;
         @endphp
 
         <aside
@@ -28,45 +28,46 @@
             <section aria-label="Filtro de Fecha por año y mes"
          class="flex flex-wrap items-center gap-3 mb-6">
   {{-- Selector de año --}}
-  <div>
-    <label for="filtro-anio" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-      Año
-    </label>
-    <select id="filtro-anio"
+  @if ($usuario->esJefe())
+    <div>
+      <label for="filtro-anio" class="block text-sm font-medium text-gray-700 dark:text-white mb-1">
+        Año
+      </label>
+      <select id="filtro-anio"
             x-model="anioSeleccionado"
-            class="rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900/70 dark:text-gray-200
-                   focus:border-indigo-500 focus:ring-indigo-500">
+            class="rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900/70 dark:text-black
+                  focus:border-indigo-500 focus:ring-indigo-500">
       @for ($i = now()->year; $i >= 2020; $i--)
-        <option value="{{ $i }}">{{ $i }}</option>
+        <option value="{{ $i }}" {{ $i === now()->year ? 'selected' : '' }}>{{ $i }}</option>
       @endfor
     </select>
-  </div>
+    </div>
 
-  {{-- Selector de mes --}}
-  <div>
-    <label for="filtro-mes" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-      Mes
-    </label>
-    <select id="filtro-mes"
+    {{-- Selector de mes --}}
+    <div>
+      <label for="filtro-mes" class="block text-sm font-medium text-gray-700 dark:text-white mb-1">
+        Mes
+      </label>
+      <select id="filtro-mes"
             x-model="mesSeleccionado"
-            class="rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900/70 dark:text-gray-200
-                   focus:border-indigo-500 focus:ring-indigo-500">
+            class="rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900/70 dark:text-black
+                  focus:border-indigo-500 focus:ring-indigo-500">
       @foreach ([
         1=>'Enero',2=>'Febrero',3=>'Marzo',4=>'Abril',5=>'Mayo',6=>'Junio',
         7=>'Julio',8=>'Agosto',9=>'Septiembre',10=>'Octubre',11=>'Noviembre',12=>'Diciembre'
       ] as $num => $mes)
-        <option value="{{ $num }}">{{ $mes }}</option>
+        <option value="{{ $num }}" {{ $num === now()->month ? 'selected' : '' }}>{{ $mes }}</option>
       @endforeach
     </select>
-  </div>
+    </div>
 
-  {{-- Botón de aplicar --}}
-  <button id="btn-aplicar-filtro-fecha" onclick="filtrarPorFecha()"
-          class="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold
-                 hover:opacity-90 shadow-lg transition">
-    Aplicar
-  </button>
-  
+    {{-- Botón de aplicar --}}
+    <button id="btn-aplicar-filtro-fecha" onclick="filtrarPorFecha()"
+      class="btn btn-primary btn-sm">
+      Aplicar
+    </button>
+  @endif
+
 </section>
             {{-- KPIs (bloque único estilo modal-glass) --}}
             <section aria-label="Indicadores clave">
@@ -109,22 +110,24 @@
             </section>
 
             {{-- Botón Guardar Evaluación  --}}
-            <div class="mt-5">
-              <button
-                id="btn-guardar-evaluacion"
-                type="button"
-                onclick="guardarEvaluacion()"
-                class="btn btn-primary btn-block"
-                {{ $pendientes > 0 ? 'disabled' : '' }}
-                aria-disabled="{{ $pendientes > 0 ? 'true' : 'false' }}"
-              >
-                Guardar evaluación
-              </button>
+            @if ($usuario->esJefe())
+              <div class="mt-5">
+                <button
+                  id="btn-guardar-evaluacion"
+                  type="button"
+                  onclick="guardarEvaluacion()"
+                  class="btn btn-primary btn-block"
+                  {{ $pendientes > 0 ? 'disabled' : '' }}
+                  aria-disabled="{{ $pendientes > 0 ? 'true' : 'false' }}"
+                >
+                  Guardar evaluación
+                </button>
 
-              <p class="text-[13px] text-center mt-3 text-gray-700 dark:text-gray-400">
-                Evalúa a todos los empleados para activar
-              </p>
-            </div>
+                <p class="text-[13px] text-center mt-3 text-gray-700 dark:text-gray-400">
+                  Evalúa a todos los empleados para activar
+                </p>
+              </div>
+            @endif
           </div>
         </aside>
 
@@ -503,355 +506,424 @@
       aside.lg\:sticky{ max-height: calc(100vh - 1rem); display:flex; flex-direction:column; }
       aside.lg\:sticky > .p-7{ overflow:auto; }
     }
+    .btn-icon{ width:40px; height:40px; aspect-ratio:1 / 1; }
+
+    #btn-cerrar-modal{ line-height:0; }
+
+    #btn-cerrar-modal svg{
+      width:20px; height:20px; display:block; transform:none;
+    }
   </style>
 
   {{-- JavaScript --}}
   <script>
-    // TOKEN CSRF INYECTADO DESDE LARAVEL
-    const CSRF_TOKEN = '{{ csrf_token() }}';
-    const asignacionesActuales = @json($asignacionesActuales);
-    let rendimientosAsignados = !Array.isArray(asignacionesActuales) ? asignacionesActuales : {};
-    const empleados = @json($empleados) || [];
-    console.log('Rendimientos asignados:', rendimientosAsignados);
-    let cuadranteActual = null;
-    let lastTriggerBtn = null;
+  //Guardar por correo 
+  @php
+    $authId = auth()->id();
+    $authEmail = auth()->user()->correo ?? '';
+  @endphp 
+  // TOKEN CSRF INYECTADO DESDE LARAVEL
+  const AUTH_USER_ID = {{ (int) $authId }};
+  const AUTH_USER_EMAIL = @json($authEmail);
+  const AUTH_USER_TIPO = @json(auth()->user()->tipoUsuario->tipo_nombre ?? '');
+  function storageKey(suffix = '') {
+    return `ninebox_${AUTH_USER_EMAIL}_${suffix}`;
+}
+  const CSRF_TOKEN = '{{ csrf_token() }}';
+  const asignacionesActuales = @json($asignacionesActuales);
+  let rendimientosAsignados = !Array.isArray(asignacionesActuales) ? asignacionesActuales : {};
+  const empleados = @json($empleados) || [];
+  console.log('Rendimientos asignados:', rendimientosAsignados);
+  console.log('Empleados', empleados);
+  let cuadranteActual = null;
+  let lastTriggerBtn = null;
 
-    const cuadrantesData = {
-      1: { title: "Diamante en bruto", subtitle: "Alto Potencial - Bajo Desempeño", desc: "Gran potencial, su desempeño no ha sido exigido por lo que requiere desarrollarlo" },
-      2: { title: "Estrella en desarrollo", subtitle: "Alto Potencial - Medio Desempeño", desc: "Potencial y desempeño en crecimiento, con la dirección adecuada puede convertirse en una estrella" },
-      3: { title: "Estrella", subtitle: "Alto Potencial - Alto Desempeño", desc: "Empleados con alto desempeño y gran potencial, clave para la organización" },
-      4: { title: "Mal empleado", subtitle: "Medio Potencial - Bajo Desempeño", desc: "Desempeño insuficiente, requiere mejora y desarrollo" },
-      5: { title: "Personal sólido", subtitle: "Medio Potencial - Medio Desempeño", desc: "Desempeño aceptable, pero con potencial limitado para crecer" },
-      6: { title: "Elemento importante", subtitle: "Medio Potencial - Alto Desempeño", desc: "Buena contribución actual, pero con un potencial de crecimiento incierto" },
-      7: { title: "Inaceptable", subtitle: "Bajo Potencial - Bajo Desempeño", desc: "Desempeño inaceptable, requiere acción inmediata" },
-      8: { title: "Aceptable", subtitle: "Bajo Potencial - Medio Desempeño", desc: "Desempeño básico, cumple con los mínimos requerimientos" },
-      9: { title: "Personal clave", subtitle: "Bajo Potencial - Alto Desempeño", desc: "Empleados confiables con buen desempeño, pero con poco potencial de desarrollo" }
-    };
-
-    document.addEventListener('DOMContentLoaded', () => {
-      const bar = document.getElementById('avance-bar');
-      const pct = @json($pct);
-      if (bar) {
-        bar.style.width = pct + '%';
-        bar.textContent = pct + '%';
+  const cuadrantesData = {
+    1: { title: "Diamante en bruto", subtitle: "Alto Potencial - Bajo Desempeño", desc: "Gran potencial, su desempeño no ha sido exigido por lo que requiere desarrollarlo" },
+    2: { title: "Estrella en desarrollo", subtitle: "Alto Potencial - Medio Desempeño", desc: "Potencial y desempeño en crecimiento, con la dirección adecuada puede convertirse en una estrella" },
+    3: { title: "Estrella", subtitle: "Alto Potencial - Alto Desempeño", desc: "Empleados con alto desempeño y gran potencial, clave para la organización" },
+    4: { title: "Mal empleado", subtitle: "Medio Potencial - Bajo Desempeño", desc: "Desempeño insuficiente, requiere mejora y desarrollo" },
+    5: { title: "Personal sólido", subtitle: "Medio Potencial - Medio Desempeño", desc: "Desempeño aceptable, pero con potencial limitado para crecer" },
+    6: { title: "Elemento importante", subtitle: "Medio Potencial - Alto Desempeño", desc: "Buena contribución actual, pero con un potencial de crecimiento incierto" },
+    7: { title: "Inaceptable", subtitle: "Bajo Potencial - Bajo Desempeño", desc: "Desempeño inaceptable, requiere acción inmediata" },
+    8: { title: "Aceptable", subtitle: "Bajo Potencial - Medio Desempeño", desc: "Desempeño básico, cumple con los mínimos requerimientos" },
+    9: { title: "Personal clave", subtitle: "Bajo Potencial - Alto Desempeño", desc: "Empleados confiables con buen desempeño, pero con poco potencial de desarrollo" }
+  };
+  
+  function cargarDesdeSessionStorage() {
+    try {
+      const key = storageKey('rendimientosAsignados');
+      const stored = sessionStorage.getItem(key);
+      if (stored){
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === 'object'){
+          rendimientosAsignados = parsed;
+          recalcularBadges();
+          actualizarEstadisticas('recalcular');
+        }
       }
+    } catch (error) {
+      console.error('Error al cargar sessionStorage:', error);
+      const key = storageKey('rendimientosAsignados');
+      sessionStorage.removeItem(key);
+    }
+  }
 
-      document.querySelectorAll('.cuadrante-btn').forEach(btn => {
-        btn.addEventListener('click', function(e) {
-          e.preventDefault(); e.stopPropagation();
-          lastTriggerBtn = this;
-          const id = this.getAttribute('data-cuadrante');
-          mostrarModal(id);
-        });
+  function guardarEnSessionStorage() {
+    try {
+      const key = storageKey('rendimientosAsignados');
+      sessionStorage.setItem(key, JSON.stringify(rendimientosAsignados));
+    } catch (error){
+      console.error('Error al guardar sessionStorage:', error);
+    }
+  }
+
+  function limpiarSessionStorage() {
+    const key = storageKey('rendimientosAsignados');
+    sessionStorage.removeItem(key);
+
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const bar = document.getElementById('avance-bar');
+    const pct = @json($pct);
+    if (bar) {
+      bar.style.width = pct + '%';
+      bar.textContent = pct + '%';
+    }
+
+    document.querySelectorAll('.cuadrante-btn').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault(); e.stopPropagation();
+        lastTriggerBtn = this;
+        const id = this.getAttribute('data-cuadrante');
+        mostrarModal(id);
       });
-
-      const modalWrapper = document.getElementById('modal-empleados');
-      const modalBackdrop = document.getElementById('modal-backdrop');
-      const btnCerrar = document.getElementById('btn-cerrar-modal');
-
-      if (modalWrapper) {
-        modalWrapper.addEventListener('click', function(e) {
-          if (e.target === modalWrapper) cerrarModal();
-        });
-      }
-      if (modalBackdrop) modalBackdrop.addEventListener('click', cerrarModal);
-      if (btnCerrar) btnCerrar.addEventListener('click', (e) => { e.preventDefault(); cerrarModal(); });
-
-      document.addEventListener('keydown', function(e) {
-        const modal = document.getElementById('modal-empleados');
-        if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) cerrarModal();
-      });
-
-      const img = document.getElementById('ninebox-img');
-      if (img) img.addEventListener('contextmenu', (e) => { e.preventDefault(); return false; });
     });
 
-    // === Badge animado y consistente con el botón ===
-    function setBadgeCount(cuadranteId, count){
-      const btn = document.querySelector(`.cuadrante-btn[data-cuadrante="${cuadranteId}"]`);
-      if(!btn) return;
+    const modalWrapper = document.getElementById('modal-empleados');
+    const modalBackdrop = document.getElementById('modal-backdrop');
+    const btnCerrar = document.getElementById('btn-cerrar-modal');
 
-      let badge = btn.querySelector('.cuadrante-badge');
-
-      if(count > 0){
-        if(!badge){
-          badge = document.createElement('div');
-          badge.className = 'cuadrante-badge';
-          btn.appendChild(badge);
-        }
-        const old = badge.textContent;
-        badge.textContent = String(count);
-
-        if (old !== String(count)) {
-          badge.classList.remove('bump');
-          // reflow para reiniciar la animación
-          // eslint-disable-next-line no-unused-expressions
-          badge.offsetWidth;
-          badge.classList.add('bump');
-        }
-      }else{
-        if(badge) badge.remove();
-      }
+    if (modalWrapper) {
+      modalWrapper.addEventListener('click', function(e) {
+        if (e.target === modalWrapper) cerrarModal();
+      });
     }
+    if (modalBackdrop) modalBackdrop.addEventListener('click', cerrarModal);
+    if (btnCerrar) btnCerrar.addEventListener('click', (e) => { e.preventDefault(); cerrarModal(); });
 
-    // === Modal con entrada/salida suave (clase .show) ===
-    function mostrarModal(cuadrante){
-      cuadranteActual = cuadrante;
-      const data = cuadrantesData[cuadrante] || { title:'Cuadrante', subtitle:'', desc:'' };
-      const titleEl = document.getElementById('modal-title');
-      const descEl  = document.getElementById('modal-desc');
-      if (titleEl) titleEl.textContent = data.title;
-      if (descEl)  descEl.textContent  = data.desc;
-
-      const countA = document.getElementById('count-asignados');
-      const countD = document.getElementById('count-disponibles');
-      if (countA) countA.textContent = '0';
-      if (countD) countD.textContent = '0';
-
+    document.addEventListener('keydown', function(e) {
       const modal = document.getElementById('modal-empleados');
-      if (modal){
-        modal.classList.remove('hidden');
-        requestAnimationFrame(() => modal.classList.add('show'));
+      if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) cerrarModal();
+    });
+
+    const img = document.getElementById('ninebox-img');
+    if (img) img.addEventListener('contextmenu', (e) => { e.preventDefault(); return false; });
+
+    // CARGAR DATOS DE SESSIONSTORAGE AL FINAL
+    cargarDesdeSessionStorage();
+  });
+
+  function setBadgeCount(cuadranteId, count){
+    const btn = document.querySelector(`.cuadrante-btn[data-cuadrante="${cuadranteId}"]`);
+    if(!btn) return;
+
+    let badge = btn.querySelector('.cuadrante-badge');
+
+    if(count > 0){
+      if(!badge){
+        badge = document.createElement('div');
+        badge.className = 'cuadrante-badge';
+        btn.appendChild(badge);
+      }
+      const old = badge.textContent;
+      badge.textContent = String(count);
+
+      if (old !== String(count)) {
+        badge.classList.remove('bump');
+        badge.offsetWidth;
+        badge.classList.add('bump');
+      }
+    }else{
+      if(badge) badge.remove();
+    }
+  }
+
+  // === Modal con entrada/salida suave (clase .show) ===
+  function mostrarModal(cuadrante){
+    cuadranteActual = cuadrante;
+    const data = cuadrantesData[cuadrante] || { title:'Cuadrante', subtitle:'', desc:'' };
+    const titleEl = document.getElementById('modal-title');
+    const descEl  = document.getElementById('modal-desc');
+    if (titleEl) titleEl.textContent = data.title;
+    if (descEl)  descEl.textContent  = data.desc;
+
+    const countA = document.getElementById('count-asignados');
+    const countD = document.getElementById('count-disponibles');
+    if (countA) countA.textContent = '0';
+    if (countD) countD.textContent = '0';
+
+    const modal = document.getElementById('modal-empleados');
+    if (modal){
+      modal.classList.remove('hidden');
+      requestAnimationFrame(() => modal.classList.add('show'));
+    }
+    actualizarListasEmpleados();
+  }
+
+  function cerrarModal(){
+    const modal = document.getElementById('modal-empleados');
+    if (!modal) return;
+    modal.classList.remove('show');
+    setTimeout(() => {
+      modal.classList.add('hidden');
+      if (lastTriggerBtn) {
+        try { lastTriggerBtn.focus(); } catch(_) {}
+      } else {
+        const firstBtn = document.querySelector('.cuadrante-btn');
+        if (firstBtn) firstBtn.focus();
+      }
+    }, 220);
+  }
+    
+  function asignarEmpleado(usuarioId){
+    try{
+      if(rendimientosAsignados[cuadranteActual] === undefined){
+        rendimientosAsignados[cuadranteActual] = [];
+      }
+      const rendimientos = rendimientosAsignados[cuadranteActual];
+      if(rendimientos.find(rendimiento => rendimiento.usuario_id === parseInt(usuarioId))) return;
+      rendimientos.push({ usuario_id: parseInt(usuarioId), ninebox_id: parseInt(cuadranteActual) });
+      actualizarEstadisticas();
+      guardarEnSessionStorage(); 
+    }catch(error){
+      console.error('Error fetch asignar:', error);
+      alert('Error al asignar empleado: ' + error.message);
+    }
+  }
+
+  function eliminarEmpleado(usuarioId){
+    if(!confirm('¿Eliminar esta asignación?')) return;
+    try{
+      if(rendimientosAsignados[cuadranteActual] === undefined){
+        rendimientosAsignados[cuadranteActual] = [];
+      }
+      const rendimientos = rendimientosAsignados[cuadranteActual];
+      if(!rendimientos.find(rendimiento => rendimiento.usuario_id === parseInt(usuarioId))) return;
+      rendimientos?.splice(rendimientos?.findIndex(rendimiento => rendimiento.usuario_id === parseInt(usuarioId)), 1);
+      console.log('rendimientosAsignados', rendimientosAsignados);
+      actualizarEstadisticas(false);
+      guardarEnSessionStorage(); 
+    }catch(error){
+      console.error('Error fetch eliminar:', error);
+      alert('Error al eliminar asignación: ' + error.message);
+    }
+  }
+
+  function actualizarEstadisticas(aumentar = true){
+    try{
+      const elTotal = document.getElementById('total-empleados');
+      const elEval  = document.getElementById('empleados-evaluados');
+      const elPend  = document.getElementById('empleados-pendientes');
+      const bar     = document.getElementById('avance-bar');
+      const btn     = document.getElementById('btn-guardar-evaluacion');
+
+      const totalDom = parseInt(elTotal?.textContent || '0');
+      const total = Number.isFinite(totalDom) && totalDom > 0 ? totalDom : (Array.isArray(empleados) ? empleados.length : 0) || 0;
+
+      let actualEvaluados;
+
+      if (aumentar === 'recalcular'){
+        const idsEvaluados = Object
+          .values(rendimientosAsignados ?? {})
+          .flatMap(arr => Array.isArray(arr) ? arr : [])
+          .map(r => parseInt(r.usuario_id))
+          .filter(n => Number.isFinite(n));
+        actualEvaluados = (new Set(idsEvaluados)).size;
+      } else {
+        const evaluadosDom = parseInt(elEval?.textContent || '0');
+        const provisional = aumentar ? (evaluadosDom + 1) : Math.max(0, evaluadosDom - 1);
+        actualEvaluados = Math.min(provisional, total);
+      }
+
+      const pendientes = Math.max(0, total - actualEvaluados);
+
+      if (elTotal) elTotal.textContent = total;
+      if (elEval)  elEval.textContent  = actualEvaluados;
+      if (elPend)  elPend.textContent  = pendientes;
+
+      const pct = total > 0 ? Math.round((actualEvaluados / total) * 100) : 0;
+      if (bar){
+        bar.textContent = pct + '%';
+        bar.style.width = pct + '%';
+      }
+
+      if (btn){
+        const habilitar = pendientes === 0 && total > 0;
+        btn.disabled = !habilitar;
       }
       actualizarListasEmpleados();
+    }catch(err){
+      console.log('Ocurrió un error', err);
     }
+  }
 
-    function cerrarModal(){
-      const modal = document.getElementById('modal-empleados');
-      if (!modal) return;
-      modal.classList.remove('show');
-      setTimeout(() => {
-        modal.classList.add('hidden');
-        if (lastTriggerBtn) {
-          try { lastTriggerBtn.focus(); } catch(_) {}
-        } else {
-          const firstBtn = document.querySelector('.cuadrante-btn');
-          if (firstBtn) firstBtn.focus();
-        }
-      }, 220);
-    }
-      
-    function asignarEmpleado(usuarioId){
-      try{
-        if(rendimientosAsignados[cuadranteActual] === undefined){
-          rendimientosAsignados[cuadranteActual] = [];
-        }
-        const rendimientos = rendimientosAsignados[cuadranteActual];
-        if(rendimientos.find(rendimiento => rendimiento.usuario_id === parseInt(usuarioId))) return;
-        rendimientos.push({ usuario_id: parseInt(usuarioId), ninebox_id: parseInt(cuadranteActual) });
-        actualizarEstadisticas();
-      }catch(error){
-        console.error('Error fetch asignar:', error);
-        alert('Error al asignar empleado: ' + error.message);
-      }
-    }
+  function crearListaEmpleados(elemLista, listaEmpty, empleados, esAsignados){
+    if (elemLista) elemLista.innerHTML = '';
+    if (empleados.length > 0){
+      if (listaEmpty) listaEmpty.classList.add('hidden');
+      empleados.forEach((emp, index) => {
+        const li = document.createElement('li');
+        li.className = 'lista-empleado flex items-center justify-between border-l-4 border-green-500';
+        li.style.animation = `slideIn 0.32s ease-out ${index * 0.05}s both`;
 
-    function eliminarEmpleado(usuarioId){
-      if(!confirm('¿Eliminar esta asignación?')) return;
-      try{
-        if(rendimientosAsignados[cuadranteActual] === undefined){
-          rendimientosAsignados[cuadranteActual] = [];
-        }
-        const rendimientos = rendimientosAsignados[cuadranteActual];
-        if(!rendimientos.find(rendimiento => rendimiento.usuario_id === parseInt(usuarioId))) return;
-        rendimientos?.splice(rendimientos?.findIndex(rendimiento => rendimiento.usuario_id === parseInt(usuarioId)), 1);
-        console.log('rendimientosAsignados', rendimientosAsignados);
-        actualizarEstadisticas(false);
-      }catch(error){
-        console.error('Error fetch eliminar:', error);
-        alert('Error al eliminar asignación: ' + error.message);
-      }
-    }
+        const left = document.createElement('div');
+        left.className = 'flex items-center gap-3';
 
-    function actualizarEstadisticas(aumentar = true){
-      try{
-        const elTotal = document.getElementById('total-empleados');
-        const elEval  = document.getElementById('empleados-evaluados');
-        const elPend  = document.getElementById('empleados-pendientes');
+        const icon = document.createElement('div');
+        icon.className = 'avatar-icon';
+        icon.innerHTML = `<svg class="w-5 h-5 text-gray-700 dark:text-gray-200" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a5 5 0 100-10 5 5 0 000 10zM2 18a8 8 0 0116 0H2z"/></svg>`;
 
-        const total = parseInt(elTotal?.textContent || '0');
-        const evaluados = parseInt(elEval?.textContent || '0');
-        const countEvaluados= aumentar ? evaluados + 1 : Math.max(0, evaluados - 1);
-        const actualEvaluados = countEvaluados > total ? total : countEvaluados;
-        const pendientes = Math.max(0, total - actualEvaluados);
+        const name = document.createElement('span');
+        name.className = 'font-semibold text-gray-900 dark:text-white nombre-empleado';
+        name.textContent = `${emp.nombre||''} ${emp.apellido_paterno||''} ${emp.apellido_materno||''}`;
 
-        if (elTotal) elTotal.textContent = total;
-        if (elEval) elEval.textContent = actualEvaluados;
-        if (elPend) elPend.textContent = pendientes;
+        left.appendChild(icon);
+        left.appendChild(name);
 
-        const pct = total > 0 ? Math.round((actualEvaluados / total) * 100) : 0;
-        const bar = document.getElementById('avance-bar');
-        if (bar) {
-          bar.textContent = pct + '%';
-          bar.style.width = pct + '%';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.id = emp.id;
+
+        if(esAsignados){
+          btn.className = 'btn btn-danger btn-sm eliminar-btn';
+          btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3m-4 0h14"/></svg><span class="sr-only">Eliminar</span>`;
+          btn.addEventListener('click', (e) => { e.stopPropagation(); eliminarEmpleado(emp.id); });
+        }else{
+          btn.className = 'btn btn-primary btn-sm asignar-btn';
+          btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span class="sr-only">Asignar</span>`;
+          btn.addEventListener('click', (e) => { e.stopPropagation(); asignarEmpleado(emp.id); });
         }
 
-        const btn = document.getElementById('btn-guardar-evaluacion');
-        if (btn){
-          const habilitar = pendientes === 0 && total > 0;
-          btn.disabled = !habilitar;
-        }
-        actualizarListasEmpleados();
-      }catch(err){
-        console.log('Ocurrió un error', err);
-      }
+        li.appendChild(left);
+        li.appendChild(btn);
+        if (elemLista) elemLista.appendChild(li);
+      });
+    }else{
+      if (listaEmpty) listaEmpty.classList.remove('hidden');
     }
+  }
 
-    function crearListaEmpleados(elemLista, listaEmpty, empleados, esAsignados){
-      if (elemLista) elemLista.innerHTML = '';
-      if (empleados.length > 0){
-        if (listaEmpty) listaEmpty.classList.add('hidden');
-        empleados.forEach((emp, index) => {
-          const li = document.createElement('li');
-          li.className = 'lista-empleado flex items-center justify-between border-l-4 border-green-500';
-          li.style.animation = `slideIn 0.32s ease-out ${index * 0.05}s both`;
+  function renderizarEmpleados(asignados, disponibles){
+    const elemListaAsignados = document.getElementById('lista-asignados');
+    const elemListaDisponibles = document.getElementById('lista-disponibles');
+    const emptyAsignados = document.getElementById('empty-asignados');
+    const emptyDisponibles = document.getElementById('empty-disponibles');
+    const countA = document.getElementById('count-asignados');
+    const countD = document.getElementById('count-disponibles');
 
-          const left = document.createElement('div');
-          left.className = 'flex items-center gap-3';
+    if (countA) countA.textContent = asignados.length;
+    if (countD) countD.textContent = disponibles.length;
 
-          const icon = document.createElement('div');
-          icon.className = 'avatar-icon';
-          icon.innerHTML = `<svg class="w-5 h-5 text-gray-700 dark:text-gray-200" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a5 5 0 100-10 5 5 0 000 10zM2 18a8 8 0 0116 0H2z"/></svg>`;
+    crearListaEmpleados(elemListaAsignados, emptyAsignados, asignados, true);
+    crearListaEmpleados(elemListaDisponibles, emptyDisponibles, disponibles, false);
+  }
 
-          const name = document.createElement('span');
-          name.className = 'font-semibold text-gray-900 dark:text-white nombre-empleado';
-          name.textContent = `${emp.nombre||''} ${emp.apellido_paterno||''} ${emp.apellido_materno||''}`;
+  function actualizarListasEmpleados() {
+    const idsEmpleadosAsignadosCuadrante = (rendimientosAsignados[cuadranteActual] ?? [])
+    .map(rendimiento => rendimiento.usuario_id);
 
-          left.appendChild(icon);
-          left.appendChild(name);
+    const empleadosAsignados = empleados.filter(emp =>
+      idsEmpleadosAsignadosCuadrante.includes(emp.id)
+    );
 
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.dataset.id = emp.id;
-
-          if(esAsignados){
-            btn.className = 'btn btn-danger btn-sm eliminar-btn';
-            btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3m-4 0h14"/></svg><span class="sr-only">Eliminar</span>`;
-            btn.addEventListener('click', (e) => { e.stopPropagation(); eliminarEmpleado(emp.id); });
-          }else{
-            btn.className = 'btn btn-primary btn-sm asignar-btn';
-            btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span class="sr-only">Asignar</span>`;
-            btn.addEventListener('click', (e) => { e.stopPropagation(); asignarEmpleado(emp.id); });
-          }
-
-          li.appendChild(left);
-          li.appendChild(btn);
-          if (elemLista) elemLista.appendChild(li);
-        });
-      }else{
-        if (listaEmpty) listaEmpty.classList.remove('hidden');
-      }
-    }
-
-       // === Render de listas con botones armonizados ===
-    function renderizarEmpleados(asignados, disponibles){
-      const elemListaAsignados = document.getElementById('lista-asignados');
-      const elemListaDisponibles = document.getElementById('lista-disponibles');
-      const emptyAsignados = document.getElementById('empty-asignados');
-      const emptyDisponibles = document.getElementById('empty-disponibles');
-      const countA = document.getElementById('count-asignados');
-      const countD = document.getElementById('count-disponibles');
-
-      if (countA) countA.textContent = asignados.length;
-      if (countD) countD.textContent = disponibles.length;
-
-      crearListaEmpleados(elemListaAsignados, emptyAsignados, asignados, true);
-      crearListaEmpleados(elemListaDisponibles, emptyDisponibles, disponibles, false);
-    }
-
-    function actualizarListasEmpleados() {
-      const idsEmpleadosAsignadosCuadrante = (rendimientosAsignados[cuadranteActual] ?? [])
+    const idsEmpleadosAsignadosTotales = Object
+      .values(rendimientosAsignados ?? {})
+      .flatMap(arr => (Array.isArray(arr) ? arr : []))
       .map(rendimiento => rendimiento.usuario_id);
 
-      const empleadosAsignados = empleados.filter(emp =>
-        idsEmpleadosAsignadosCuadrante.includes(emp.id)
-      );
+    const empleadosDisponibles = empleados.filter(
+      emp => !idsEmpleadosAsignadosTotales.includes(emp.id)
+    );
 
-      const idsEmpleadosAsignadosTotales = Object
-        .values(rendimientosAsignados ?? {})
-        .flatMap(arr => (Array.isArray(arr) ? arr : []))
-        .map(rendimiento => rendimiento.usuario_id);
+    renderizarEmpleados(empleadosAsignados, empleadosDisponibles);
+    setBadgeCount(cuadranteActual, empleadosAsignados.length);
+  }
 
-      const empleadosDisponibles = empleados.filter(
-        emp => !idsEmpleadosAsignadosTotales.includes(emp.id)
-      );
+  async function guardarEvaluacion(){
+    try{
+      const anio = document.getElementById('filtro-anio').value;
+      const mes = document.getElementById('filtro-mes').value;
+      const formData = new FormData();
+      formData.append('anio', anio);
+      formData.append('mes', mes);
+      formData.append('rendimientosAsignados', JSON.stringify(rendimientosAsignados));
+      formData.append('_token', CSRF_TOKEN);
 
-      renderizarEmpleados(empleadosAsignados, empleadosDisponibles);
-      setBadgeCount(cuadranteActual, empleadosAsignados.length);
-    }
+      const response = await fetch('/ninebox/guardar-evaluacion', {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+        body: formData
+      });
 
-
-    async function guardarEvaluacion(){
-      try{
-        const anio = document.getElementById('filtro-anio').value;
-        const mes = document.getElementById('filtro-mes').value;
-        const formData = new FormData();
-        formData.append('anio', anio);
-        formData.append('mes', mes);
-        formData.append('rendimientosAsignados', JSON.stringify(rendimientosAsignados));
-        formData.append('_token', CSRF_TOKEN);
-
-        const response = await fetch('/ninebox/guardar-evaluacion', {
-          method: 'POST',
-          headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-          credentials: 'same-origin',
-          body: formData
-        });
-
-        if(!response.ok){
-          const errorText = await response.text();
-          console.error('Error al guardar evaluación:', errorText);
-          alert('Error al guardar evaluación (código ' + response.status + ')');
-          return;
-        }
-
-        await response.json();
-        alert('Evaluación guardada con éxito');
-      }catch(error){
-        console.error('Error fetch guardar evaluación:', error);
-        alert('Error al guardar evaluación: ' + error.message);
+      if(!response.ok){
+        const errorText = await response.text();
+        console.error('Error al guardar evaluación:', errorText);
+        alert('Error al guardar evaluación (código ' + response.status + ')');
+        return;
       }
-    }
 
-    function recalcularBadges(){
-      for (let i = 1; i <= 9; i++) {
-        const lista = rendimientosAsignados[String(i)] ?? [];
-        setBadgeCount(i, Array.isArray(lista) ? lista.length : 0);
+      await response.json();
+      alert('Evaluación guardada con éxito');
+      limpiarSessionStorage(); 
+    }catch(error){
+      console.error('Error fetch guardar evaluación:', error);
+      alert('Error al guardar evaluación: ' + error.message);
+    }
+  }
+
+  function recalcularBadges(){
+    for (let i = 1; i <= 9; i++) {
+      const lista = rendimientosAsignados[String(i)] ?? [];
+      setBadgeCount(i, Array.isArray(lista) ? lista.length : 0);
+    }
+  }
+
+  async function filtrarPorFecha(){
+    try{
+      console.log('aplicar');
+      const anio = document.getElementById('filtro-anio').value;
+      const mes = document.getElementById('filtro-mes').value;
+      
+      const formData = new FormData();
+      formData.append('anio', anio);
+      formData.append('mes', mes);
+      formData.append('_token', CSRF_TOKEN);
+
+      const response = await fetch('/ninebox/filtrar-rendimientos', {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+        body: formData
+      });
+      if(!response.ok){
+        const errorText = await response.text();
+        console.error('Error al filtrar evaluación:', errorText);
+        alert('Error al guardar evaluación (código ' + response.status + ')');
+        return;
       }
+      const data = await response.json(); 
+      rendimientosAsignados = !Array.isArray(data?.asignacionesPorFecha) ? data?.asignacionesPorFecha : {};
+      console.log('rednimientosAsig', rendimientosAsignados);
+      recalcularBadges();
+      actualizarEstadisticas('recalcular');
+      guardarEnSessionStorage(); // GUARDAR DESPUÉS DE FILTRAR
+    }catch(error){
+      console.error('Error fetch filtrar evaluación:', error);
+      alert('Error al filtrar evaluación: ' + error.message);
     }
-
-    async function filtrarPorFecha(){
-      try{
-        console.log('aplicar');
-        const anio = document.getElementById('filtro-anio').value;
-        const mes = document.getElementById('filtro-mes').value;
-        
-        const formData = new FormData();
-        formData.append('anio', anio);
-        formData.append('mes', mes);
-        formData.append('_token', CSRF_TOKEN);
-
-        const response = await fetch('/ninebox/filtrar-rendimientos', {
-          method: 'POST',
-          headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-          credentials: 'same-origin',
-          body: formData
-        });
-        if(!response.ok){
-          const errorText = await response.text();
-          console.error('Error al filtrar evaluación:', errorText);
-          alert('Error al guardar evaluación (código ' + response.status + ')');
-          return;
-        }
-        const data = await response.json(); // <- aquí parseas el cuerpo JSON
-        rendimientosAsignados = !Array.isArray(data?.asignacionesPorFecha) ? data?.asignacionesPorFecha : {};
-        console.log('rednimientosAsig', rendimientosAsignados);
-        recalcularBadges();
-        actualizarEstadisticas();
-      }catch(error){
-        console.error('Error fetch filtrar evaluación:', error);
-        alert('Error al filtrar evaluación: ' + error.message);
-      }
-    }
+  }
   </script>
 </x-app-layout>

@@ -82,17 +82,22 @@ class User extends Authenticatable
     
     public function esJefe()
     {
-        return $this->tipo_usuario_id == 2;
+        return $this->tipoUsuario->tipo_nombre === 'Jefe';
     }
 
     public function esSuperusuario()
     {
-        return $this->tipo_usuario_id == 1;
+        return $this->tipoUsuario->tipo_nombre === 'Superadmin';
     }
 
     public function esEmpleado()
     {
-        return $this->tipo_usuario_id == 3;
+        return $this->tipoUsuario->tipo_nombre === 'Empleado';
+    }
+
+    public function esRRHH()
+    {
+        return $this->tipoUsuario->tipo_nombre === 'RRHH';
     }
 
     public function getNombreCompletoAttribute()

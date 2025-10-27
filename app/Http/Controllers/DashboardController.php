@@ -10,29 +10,64 @@ use App\Models\User;
 use App\Models\NineBox;
 use App\Models\Rendimiento;
 use Illuminate\Validation\Rule;
+use App\Models\TipoUsuario;
 
 class DashboardController extends Controller
 {
     /**
      * Devuelve los empleados filtrados por departamento y tipo
      */
-    private function empleadosDelDepartamento($jefe)
+    private function empleadosDelDepartamento($usuario)
     {
-        return User::where('departamento_id', $jefe->departamento_id)
-            ->where('tipo_usuario_id', 3)
-            ->where('id', '!=', $jefe->id);
+        return User::where('departamento_id', $usuario->departamento_id)
+            ->where('tipo_usuario_id', TipoUsuario::TIPOS_USUARIO['empleado'])
+            ->where('id', '!=', $usuario->id)
+            ->with('departamento')
+            ->get(['id', 'departamento_id', 'nombre', 'apellido_paterno', 'apellido_materno'])
+            ->map(function($emp) {
+            return [
+                'id' => $emp->id,
+                'nombre' => $emp->nombre,
+                'apellido_paterno' => $emp->apellido_paterno,
+                'apellido_materno' => $emp->apellido_materno,
+                'departamento_id' => $emp->departamento_id,
+                'departamento_nombre' => $emp->departamento->nombre ?? 'Sin departamento'
+            ];
+         });
     }
 
-    public function index()
+   public function index()
     {
-        $jefe = Auth::user();
-        if ($jefe->tipo_usuario_id != 2) {
-            abort(403, 'Acceso no autorizado');
-        }
+       $usuario = Auth::user();
 
-        $empleados = $jefe->departamento_id
-            ? $this->empleadosDelDepartamento($jefe)->get(['id', 'nombre', 'apellido_paterno', 'apellido_materno'])
-            : collect();
+        if ($usuario->esEmpleado()) {
+            // Cierra la sesión manualmente
+            Auth::guard('web')->logout();
+            return redirect()->route('login')
+                ->with('error', 'Sesión cerrada. No tienes acceso a esta sección.');
+        }
+    
+        $empleados = collect();
+
+        if($usuario->esSuperusuario()){
+            $empleados = User::where('tipo_usuario_id', TipoUsuario::TIPOS_USUARIO['empleado'])
+                ->with('departamento')
+                ->get(['id', 'departamento_id', 'nombre', 'apellido_paterno', 'apellido_materno'])
+                ->map(function($emp) {
+                    return [
+                        'id' => $emp->id,
+                        'nombre' => $emp->nombre,
+                        'apellido_paterno' => $emp->apellido_paterno,
+                        'apellido_materno' => $emp->apellido_materno,
+                        'departamento_id' => $emp->departamento_id,
+                        'departamento_nombre' => $emp->departamento->nombre ?? 'Sin departamento'
+                    ];
+                });
+        }
+        
+        if($usuario->esJefe()){
+            $empleados = $this->empleadosDelDepartamento($usuario);
+        }
 
         $cuadrantes = NineBox::orderBy('posicion')->get();
 
@@ -50,7 +85,7 @@ class DashboardController extends Controller
             ->count();
 
         return view('ninebox.dashboard', compact(
-            'jefe', 
+            'usuario',
             'empleados', 
             'cuadrantes',
             'asignacionesActuales',
@@ -106,7 +141,7 @@ class DashboardController extends Controller
                     'usuario_id' => $rendimiento->usuario_id,
                     'ninebox_id' => $rendimiento->ninebox_id,
                 ]);
-                $newRendimiento->timestamps = false; // evita sobrescribir created_at
+                $newRendimiento->timestamps = false; 
                 $newRendimiento->created_at = $fecha;
                 $newRendimiento->save();
             }
