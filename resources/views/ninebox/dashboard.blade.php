@@ -224,15 +224,17 @@
           </div>
 
           <div class="p-6 overflow-y-auto" style="max-height: calc(80vh - 140px);">
-            {{-- Asignados --}}
-            <div class="mb-8">
+            {{-- Asignados (ID agregados para controlar vista Superadmin) --}}
+            <div id="section-asignados" class="mb-8">
               <div class="flex items-center gap-3 mb-4">
                 <div class="badge-icon bg-gradient-to-r from-green-600 to-emerald-600">
                   <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                   </svg>
                 </div>
-                <h4 class="text-xl font-bold text-gray-900 dark:text-white">Asignados</h4>
+                <h4 id="title-asignados" data-role-title="Asignados" class="text-xl font-bold text-gray-900 dark:text-white">
+                  Asignados
+                </h4>
                 <span id="count-asignados" class="chip chip-success ml-auto">0</span>
               </div>
               <div id="empty-asignados" class="text-center py-8 text-gray-400 dark:text-gray-500 hidden">
@@ -244,15 +246,17 @@
               <ul id="lista-asignados" class="space-y-3"></ul>
             </div>
 
-            {{-- Disponibles --}}
-            <div>
+            {{-- Disponibles (ID agregados para poder ocultar en Superadmin) --}}
+            <div id="section-disponibles">
               <div class="flex items-center gap-3 mb-4">
                 <div class="badge-icon bg-gradient-to-r from-blue-600 to-cyan-600">
                   <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
                   </svg>
                 </div>
-                <h4 class="text-xl font-bold text-gray-900 dark:text-white">Disponibles</h4>
+                <h4 id="title-disponibles" data-role-title="Disponibles" class="text-xl font-bold text-gray-900 dark:text-white">
+                  Disponibles
+                </h4>
                 <span id="count-disponibles" class="chip chip-info ml-auto">0</span>
               </div>
               <div id="empty-disponibles" class="text-center py-8 text-gray-400 dark:text-gray-500 hidden">
@@ -513,216 +517,270 @@
     #btn-cerrar-modal svg{
       width:20px; height:20px; display:block; transform:none;
     }
+    .depto-header {
+      list-style: none;
+      padding-left: 0;
+    }
+    .depto-header + .lista-empleado { margin-top: .25rem; }
   </style>
 
   {{-- JavaScript --}}
-  <script>
-  //Guardar por correo 
-  @php
-    $authId = auth()->id();
-    $authEmail = auth()->user()->correo ?? '';
-  @endphp 
-  // TOKEN CSRF INYECTADO DESDE LARAVEL
-  const AUTH_USER_ID = {{ (int) $authId }};
-  const AUTH_USER_EMAIL = @json($authEmail);
-  const AUTH_USER_TIPO = @json(auth()->user()->tipoUsuario->tipo_nombre ?? '');
-  function storageKey(suffix = '') {
-    return `ninebox_${AUTH_USER_EMAIL}_${suffix}`;
-}
-  const CSRF_TOKEN = '{{ csrf_token() }}';
-  const asignacionesActuales = @json($asignacionesActuales);
-  let rendimientosAsignados = !Array.isArray(asignacionesActuales) ? asignacionesActuales : {};
-  const empleados = @json($empleados) || [];
-  console.log('Rendimientos asignados:', rendimientosAsignados);
-  console.log('Empleados', empleados);
-  let cuadranteActual = null;
-  let lastTriggerBtn = null;
+ <script>
+    @php
+      $authId = auth()->id();
+      $authEmail = auth()->user()->correo ?? '';
+    @endphp
 
-  const cuadrantesData = {
-    1: { title: "Diamante en bruto", subtitle: "Alto Potencial - Bajo Desempeño", desc: "Gran potencial, su desempeño no ha sido exigido por lo que requiere desarrollarlo" },
-    2: { title: "Estrella en desarrollo", subtitle: "Alto Potencial - Medio Desempeño", desc: "Potencial y desempeño en crecimiento, con la dirección adecuada puede convertirse en una estrella" },
-    3: { title: "Estrella", subtitle: "Alto Potencial - Alto Desempeño", desc: "Empleados con alto desempeño y gran potencial, clave para la organización" },
-    4: { title: "Mal empleado", subtitle: "Medio Potencial - Bajo Desempeño", desc: "Desempeño insuficiente, requiere mejora y desarrollo" },
-    5: { title: "Personal sólido", subtitle: "Medio Potencial - Medio Desempeño", desc: "Desempeño aceptable, pero con potencial limitado para crecer" },
-    6: { title: "Elemento importante", subtitle: "Medio Potencial - Alto Desempeño", desc: "Buena contribución actual, pero con un potencial de crecimiento incierto" },
-    7: { title: "Inaceptable", subtitle: "Bajo Potencial - Bajo Desempeño", desc: "Desempeño inaceptable, requiere acción inmediata" },
-    8: { title: "Aceptable", subtitle: "Bajo Potencial - Medio Desempeño", desc: "Desempeño básico, cumple con los mínimos requerimientos" },
-    9: { title: "Personal clave", subtitle: "Bajo Potencial - Alto Desempeño", desc: "Empleados confiables con buen desempeño, pero con poco potencial de desarrollo" }
-  };
-  
-  function cargarDesdeSessionStorage() {
-    try {
-      const key = storageKey('rendimientosAsignados');
-      const stored = sessionStorage.getItem(key);
-      if (stored){
-        const parsed = JSON.parse(stored);
-        if (parsed && typeof parsed === 'object'){
-          rendimientosAsignados = parsed;
-          recalcularBadges();
-          actualizarEstadisticas('recalcular');
-        }
-      }
-    } catch (error) {
-      console.error('Error al cargar sessionStorage:', error);
-      const key = storageKey('rendimientosAsignados');
-      sessionStorage.removeItem(key);
-    }
-  }
+    const AUTH_USER_ID   = {{ (int) $authId }};
+    const AUTH_USER_EMAIL= @json($authEmail);
+    const AUTH_USER_TIPO = @json(auth()->user()->tipoUsuario->tipo_nombre ?? '');
+    const CSRF_TOKEN     = '{{ csrf_token() }}';
 
-  function guardarEnSessionStorage() {
-    try {
-      const key = storageKey('rendimientosAsignados');
-      sessionStorage.setItem(key, JSON.stringify(rendimientosAsignados));
-    } catch (error){
-      console.error('Error al guardar sessionStorage:', error);
-    }
-  }
+    function storageKey(suffix = '') { return `ninebox_${AUTH_USER_EMAIL}_${suffix}`; }
+    function esSuperusuario() { return AUTH_USER_TIPO === 'Superadmin'; }
+    function esJefe()        { return AUTH_USER_TIPO === 'Jefe'; }
 
-  function limpiarSessionStorage() {
-    const key = storageKey('rendimientosAsignados');
-    sessionStorage.removeItem(key);
+    const asignacionesActuales = @json($asignacionesActuales);
+    let rendimientosAsignados  = !Array.isArray(asignacionesActuales) ? asignacionesActuales : {};
+    const empleados            = @json($empleados) || [];
 
-  }
+    let cuadranteActual = null;
+    let lastTriggerBtn  = null;
 
-  document.addEventListener('DOMContentLoaded', () => {
-    const bar = document.getElementById('avance-bar');
-    const pct = @json($pct);
-    if (bar) {
-      bar.style.width = pct + '%';
-      bar.textContent = pct + '%';
+    const cuadrantesData = {
+      1:{title:"Diamante en bruto",desc:"Gran potencial, su desempeño no ha sido exigido por lo que requiere desarrollarlo"},
+      2:{title:"Estrella en desarrollo",desc:"Potencial y desempeño en crecimiento, con la dirección adecuada puede convertirse en una estrella"},
+      3:{title:"Estrella",desc:"Empleados con alto desempeño y gran potencial, clave para la organización"},
+      4:{title:"Mal empleado",desc:"Desempeño insuficiente, requiere mejora y desarrollo"},
+      5:{title:"Personal sólido",desc:"Desempeño aceptable, pero con potencial limitado para crecer"},
+      6:{title:"Elemento importante",desc:"Buena contribución actual, pero con un potencial de crecimiento incierto"},
+      7:{title:"Inaceptable",desc:"Desempeño inaceptable, requiere acción inmediata"},
+      8:{title:"Aceptable",desc:"Desempeño básico, cumple con los mínimos requerimientos"},
+      9:{title:"Personal clave",desc:"Confiables con buen desempeño, pero con poco potencial de desarrollo"}
+    };
+
+    function agruparPorDepartamento(lista){
+      return lista.reduce((acc, emp)=>{
+        const d = emp.departamento_nombre || 'Sin departamento';
+        (acc[d] ||= []).push(emp);
+        return acc;
+      },{});
     }
 
-    document.querySelectorAll('.cuadrante-btn').forEach(btn => {
-      btn.addEventListener('click', function(e) {
-        e.preventDefault(); e.stopPropagation();
-        lastTriggerBtn = this;
-        const id = this.getAttribute('data-cuadrante');
-        mostrarModal(id);
-      });
-    });
+    // --- UI superadmin: ocultar cabeceras y sección "Disponibles"
+    function aplicarModoSuperadminUI(){
+      const secDisp   = document.getElementById('section-disponibles');
+      const titleAsig = document.getElementById('title-asignados');
+      const countA    = document.getElementById('count-asignados');
+      const countD    = document.getElementById('count-disponibles');
+      const headerRow = titleAsig ? titleAsig.closest('div.flex.items-center') : null;
 
-    const modalWrapper = document.getElementById('modal-empleados');
-    const modalBackdrop = document.getElementById('modal-backdrop');
-    const btnCerrar = document.getElementById('btn-cerrar-modal');
-
-    if (modalWrapper) {
-      modalWrapper.addEventListener('click', function(e) {
-        if (e.target === modalWrapper) cerrarModal();
-      });
-    }
-    if (modalBackdrop) modalBackdrop.addEventListener('click', cerrarModal);
-    if (btnCerrar) btnCerrar.addEventListener('click', (e) => { e.preventDefault(); cerrarModal(); });
-
-    document.addEventListener('keydown', function(e) {
-      const modal = document.getElementById('modal-empleados');
-      if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) cerrarModal();
-    });
-
-    const img = document.getElementById('ninebox-img');
-    if (img) img.addEventListener('contextmenu', (e) => { e.preventDefault(); return false; });
-
-    // CARGAR DATOS DE SESSIONSTORAGE AL FINAL
-    cargarDesdeSessionStorage();
-  });
-
-  function setBadgeCount(cuadranteId, count){
-    const btn = document.querySelector(`.cuadrante-btn[data-cuadrante="${cuadranteId}"]`);
-    if(!btn) return;
-
-    let badge = btn.querySelector('.cuadrante-badge');
-
-    if(count > 0){
-      if(!badge){
-        badge = document.createElement('div');
-        badge.className = 'cuadrante-badge';
-        btn.appendChild(badge);
-      }
-      const old = badge.textContent;
-      badge.textContent = String(count);
-
-      if (old !== String(count)) {
-        badge.classList.remove('bump');
-        badge.offsetWidth;
-        badge.classList.add('bump');
-      }
-    }else{
-      if(badge) badge.remove();
-    }
-  }
-
-  // === Modal con entrada/salida suave (clase .show) ===
-  function mostrarModal(cuadrante){
-    cuadranteActual = cuadrante;
-    const data = cuadrantesData[cuadrante] || { title:'Cuadrante', subtitle:'', desc:'' };
-    const titleEl = document.getElementById('modal-title');
-    const descEl  = document.getElementById('modal-desc');
-    if (titleEl) titleEl.textContent = data.title;
-    if (descEl)  descEl.textContent  = data.desc;
-
-    const countA = document.getElementById('count-asignados');
-    const countD = document.getElementById('count-disponibles');
-    if (countA) countA.textContent = '0';
-    if (countD) countD.textContent = '0';
-
-    const modal = document.getElementById('modal-empleados');
-    if (modal){
-      modal.classList.remove('hidden');
-      requestAnimationFrame(() => modal.classList.add('show'));
-    }
-    actualizarListasEmpleados();
-  }
-
-  function cerrarModal(){
-    const modal = document.getElementById('modal-empleados');
-    if (!modal) return;
-    modal.classList.remove('show');
-    setTimeout(() => {
-      modal.classList.add('hidden');
-      if (lastTriggerBtn) {
-        try { lastTriggerBtn.focus(); } catch(_) {}
+      if (esSuperusuario()){
+        if (secDisp)   secDisp.style.display   = 'none';
+        if (headerRow) headerRow.style.display = 'none';
+        if (countA)    countA.style.display    = 'none';
+        if (countD)    countD.style.display    = 'none';
       } else {
-        const firstBtn = document.querySelector('.cuadrante-btn');
-        if (firstBtn) firstBtn.focus();
+        if (secDisp)   secDisp.style.display   = '';
+        if (headerRow) headerRow.style.display = '';
+        if (countA)    countA.style.display    = '';
+        if (countD)    countD.style.display    = '';
       }
-    }, 220);
-  }
-    
-  function asignarEmpleado(usuarioId){
-    try{
+    }
+
+    // --- Vista solo-lectura agrupada por depto para superadmin
+    function renderizarVistaSuperadmin(elemLista, listaEmpty, listaEmpleados){
+      if (elemLista) elemLista.innerHTML = '';
+      if (!listaEmpleados || listaEmpleados.length === 0){
+        if (listaEmpty) listaEmpty.classList.remove('hidden');
+        window.superadminAsignaciones = [];
+        return;
+      }
+      if (listaEmpty) listaEmpty.classList.add('hidden');
+
+      window.superadminAsignaciones = listaEmpleados.map(e=>({
+        departamento: e.departamento_nombre || 'Sin departamento',
+        empleado: [e.nombre||'', e.apellido_paterno||'', e.apellido_materno||''].join(' ').trim()
+      }));
+
+      const grupos = agruparPorDepartamento(listaEmpleados);
+
+      Object.keys(grupos).forEach((depto, deptIndex)=>{
+        const lista = grupos[depto];
+
+        // Header del departamento
+        const liHeader = document.createElement('li');
+        liHeader.className = 'mb-3 mt-6 first:mt-0';
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-3';
+
+        const badgeIcon = document.createElement('div');
+        badgeIcon.className = 'badge-icon bg-gradient-to-r from-indigo-600 to-purple-600';
+        badgeIcon.innerHTML = '<svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>';
+
+        const h4 = document.createElement('h4');
+        h4.className = 'text-xl font-bold text-gray-900 dark:text-white';
+        h4.textContent = depto;
+
+        const chip = document.createElement('span');
+        chip.className = 'chip chip-info ml-auto';
+        chip.textContent = String(lista.length);
+
+        row.appendChild(badgeIcon); row.appendChild(h4); row.appendChild(chip);
+        liHeader.appendChild(row);
+        elemLista.appendChild(liHeader);
+
+        // Filas de empleados
+        lista.forEach((emp, empIndex)=>{
+          const li = document.createElement('li');
+          li.className = 'lista-empleado flex items-center justify-between border-l-4 border-green-500';
+          li.style.animation = 'slideIn 0.32s ease-out ' + (deptIndex*0.1 + empIndex*0.05) + 's both';
+
+          const left = document.createElement('div');
+          left.className = 'flex items-center gap-3';
+
+          const avatar = document.createElement('div');
+          avatar.className = 'avatar-icon';
+          avatar.innerHTML = '<svg class="w-5 h-5 text-gray-700 dark:text-gray-200" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a5 5 0 100-10 5 5 0 000 10zM2 18a8 8 0 0116 0H2z"/></svg>';
+
+          const name = document.createElement('span');
+          name.className = 'font-semibold text-gray-900 dark:text-white nombre-empleado';
+          name.textContent = [emp.nombre||'', emp.apellido_paterno||'', emp.apellido_materno||''].join(' ').trim();
+
+          const estado = document.createElement('span');
+          estado.className = 'chip chip-success';
+          estado.textContent = 'Asignado';
+
+          left.appendChild(avatar); left.appendChild(name);
+          li.appendChild(left); li.appendChild(estado);
+          elemLista.appendChild(li);
+        });
+      });
+    }
+
+    function cargarDesdeSessionStorage(){
+      try{
+        const stored = sessionStorage.getItem(storageKey('rendimientosAsignados'));
+        if (stored){
+          const parsed = JSON.parse(stored);
+          if (parsed && typeof parsed === 'object'){
+            rendimientosAsignados = parsed;
+            recalcularBadges();
+            actualizarEstadisticas('recalcular');
+          }
+        }
+      }catch(e){
+        sessionStorage.removeItem(storageKey('rendimientosAsignados'));
+      }
+    }
+    function guardarEnSessionStorage(){
+      try{ sessionStorage.setItem(storageKey('rendimientosAsignados'), JSON.stringify(rendimientosAsignados)); }
+      catch(_){}
+    }
+    function limpiarSessionStorage(){
+      sessionStorage.removeItem(storageKey('rendimientosAsignados'));
+    }
+
+    document.addEventListener('DOMContentLoaded', ()=>{
+      const bar = document.getElementById('avance-bar');
+      const pct = @json($pct);
+      if (bar){ bar.style.width = pct + '%'; bar.textContent = pct + '%'; }
+
+      document.querySelectorAll('.cuadrante-btn').forEach(btn=>{
+        btn.addEventListener('click', (e)=>{
+          e.preventDefault(); e.stopPropagation();
+          lastTriggerBtn = btn;
+          mostrarModal(btn.getAttribute('data-cuadrante'));
+        });
+      });
+
+      const modalWrapper = document.getElementById('modal-empleados');
+      const modalBackdrop= document.getElementById('modal-backdrop');
+      const btnCerrar    = document.getElementById('btn-cerrar-modal');
+      if (modalWrapper) modalWrapper.addEventListener('click', e=>{ if (e.target===modalWrapper) cerrarModal(); });
+      if (modalBackdrop) modalBackdrop.addEventListener('click', cerrarModal);
+      if (btnCerrar) btnCerrar.addEventListener('click', e=>{ e.preventDefault(); cerrarModal(); });
+
+      const img = document.getElementById('ninebox-img');
+      if (img) img.addEventListener('contextmenu', e=>{ e.preventDefault(); });
+
+      cargarDesdeSessionStorage();
+    });
+
+    function setBadgeCount(cuadranteId, count){
+      const btn = document.querySelector(`.cuadrante-btn[data-cuadrante="${cuadranteId}"]`);
+      if(!btn) return;
+      let badge = btn.querySelector('.cuadrante-badge');
+      if (count>0){
+        if(!badge){
+          badge = document.createElement('div');
+          badge.className = 'cuadrante-badge';
+          btn.appendChild(badge);
+        }
+        const old = badge.textContent;
+        badge.textContent = String(count);
+        if (old !== String(count)){
+          badge.classList.remove('bump'); badge.offsetWidth; badge.classList.add('bump');
+        }
+      } else if (badge){ badge.remove(); }
+    }
+
+    function mostrarModal(cuadrante){
+      cuadranteActual = cuadrante;
+      const data   = cuadrantesData[cuadrante] || {title:'Cuadrante',desc:''};
+      const title  = document.getElementById('modal-title');
+      const desc   = document.getElementById('modal-desc');
+      if (title) title.textContent = data.title;
+      if (desc)  desc.textContent  = data.desc;
+
+      // reset chips
+      const countA = document.getElementById('count-asignados');
+      const countD = document.getElementById('count-disponibles');
+      if (countA) countA.textContent = '0';
+      if (countD) countD.textContent = '0';
+
+      aplicarModoSuperadminUI();
+
+      const modal = document.getElementById('modal-empleados');
+      if (modal){ modal.classList.remove('hidden'); requestAnimationFrame(()=>modal.classList.add('show')); }
+      actualizarListasEmpleados();
+    }
+
+    function cerrarModal(){
+      const modal = document.getElementById('modal-empleados');
+      if (!modal) return;
+      modal.classList.remove('show');
+      setTimeout(()=>{
+        modal.classList.add('hidden');
+        (lastTriggerBtn?.focus?.());
+      },220);
+    }
+
+    function asignarEmpleado(usuarioId){
       if(rendimientosAsignados[cuadranteActual] === undefined){
         rendimientosAsignados[cuadranteActual] = [];
       }
-      const rendimientos = rendimientosAsignados[cuadranteActual];
-      if(rendimientos.find(rendimiento => rendimiento.usuario_id === parseInt(usuarioId))) return;
-      rendimientos.push({ usuario_id: parseInt(usuarioId), ninebox_id: parseInt(cuadranteActual) });
+      const rend = rendimientosAsignados[cuadranteActual];
+      if (rend.find(r=>r.usuario_id===parseInt(usuarioId))) return;
+      rend.push({ usuario_id: parseInt(usuarioId), ninebox_id: parseInt(cuadranteActual) });
       actualizarEstadisticas();
-      guardarEnSessionStorage(); 
-    }catch(error){
-      console.error('Error fetch asignar:', error);
-      alert('Error al asignar empleado: ' + error.message);
+      guardarEnSessionStorage();
     }
-  }
 
-  function eliminarEmpleado(usuarioId){
-    if(!confirm('¿Eliminar esta asignación?')) return;
-    try{
+    function eliminarEmpleado(usuarioId){
+      if(!confirm('¿Eliminar esta asignación?')) return;
       if(rendimientosAsignados[cuadranteActual] === undefined){
         rendimientosAsignados[cuadranteActual] = [];
       }
-      const rendimientos = rendimientosAsignados[cuadranteActual];
-      if(!rendimientos.find(rendimiento => rendimiento.usuario_id === parseInt(usuarioId))) return;
-      rendimientos?.splice(rendimientos?.findIndex(rendimiento => rendimiento.usuario_id === parseInt(usuarioId)), 1);
-      console.log('rendimientosAsignados', rendimientosAsignados);
+      const rend = rendimientosAsignados[cuadranteActual];
+      const idx  = rend.findIndex(r=>r.usuario_id===parseInt(usuarioId));
+      if (idx<0) return;
+      rend.splice(idx,1);
       actualizarEstadisticas(false);
-      guardarEnSessionStorage(); 
-    }catch(error){
-      console.error('Error fetch eliminar:', error);
-      alert('Error al eliminar asignación: ' + error.message);
+      guardarEnSessionStorage();
     }
-  }
 
-  function actualizarEstadisticas(aumentar = true){
-    try{
+    function actualizarEstadisticas(aumentar=true){
       const elTotal = document.getElementById('total-empleados');
       const elEval  = document.getElementById('empleados-evaluados');
       const elPend  = document.getElementById('empleados-pendientes');
@@ -730,200 +788,166 @@
       const btn     = document.getElementById('btn-guardar-evaluacion');
 
       const totalDom = parseInt(elTotal?.textContent || '0');
-      const total = Number.isFinite(totalDom) && totalDom > 0 ? totalDom : (Array.isArray(empleados) ? empleados.length : 0) || 0;
+      const total = Number.isFinite(totalDom) && totalDom>0 ? totalDom : (Array.isArray(empleados)?empleados.length:0);
 
       let actualEvaluados;
-
       if (aumentar === 'recalcular'){
-        const idsEvaluados = Object
-          .values(rendimientosAsignados ?? {})
-          .flatMap(arr => Array.isArray(arr) ? arr : [])
+        const ids = Object.values(rendimientosAsignados ?? {})
+          .flatMap(arr => Array.isArray(arr)?arr:[])
           .map(r => parseInt(r.usuario_id))
-          .filter(n => Number.isFinite(n));
-        actualEvaluados = (new Set(idsEvaluados)).size;
+          .filter(Number.isFinite);
+        actualEvaluados = (new Set(ids)).size;
       } else {
-        const evaluadosDom = parseInt(elEval?.textContent || '0');
-        const provisional = aumentar ? (evaluadosDom + 1) : Math.max(0, evaluadosDom - 1);
-        actualEvaluados = Math.min(provisional, total);
+        const evalDom = parseInt(elEval?.textContent || '0');
+        actualEvaluados = Math.min(aumentar ? evalDom+1 : Math.max(0, evalDom-1), total);
       }
 
       const pendientes = Math.max(0, total - actualEvaluados);
-
       if (elTotal) elTotal.textContent = total;
       if (elEval)  elEval.textContent  = actualEvaluados;
       if (elPend)  elPend.textContent  = pendientes;
 
-      const pct = total > 0 ? Math.round((actualEvaluados / total) * 100) : 0;
-      if (bar){
-        bar.textContent = pct + '%';
-        bar.style.width = pct + '%';
-      }
+      const pct = total>0 ? Math.round((actualEvaluados/total)*100) : 0;
+      if (bar){ bar.textContent = pct + '%'; bar.style.width = pct + '%'; }
 
-      if (btn){
-        const habilitar = pendientes === 0 && total > 0;
-        btn.disabled = !habilitar;
-      }
+      if (btn) btn.disabled = !(pendientes===0 && total>0);
+
       actualizarListasEmpleados();
-    }catch(err){
-      console.log('Ocurrió un error', err);
     }
-  }
 
-  function crearListaEmpleados(elemLista, listaEmpty, empleados, esAsignados){
-    if (elemLista) elemLista.innerHTML = '';
-    if (empleados.length > 0){
-      if (listaEmpty) listaEmpty.classList.add('hidden');
-      empleados.forEach((emp, index) => {
-        const li = document.createElement('li');
-        li.className = 'lista-empleado flex items-center justify-between border-l-4 border-green-500';
-        li.style.animation = `slideIn 0.32s ease-out ${index * 0.05}s both`;
+    function crearListaEmpleados(elemLista, listaEmpty, lista, esAsignados){
+      if (elemLista) elemLista.innerHTML = '';
+      if (lista.length > 0){
+        if (listaEmpty) listaEmpty.classList.add('hidden');
+        lista.forEach((emp, i)=>{
+          const li = document.createElement('li');
+          li.className = 'lista-empleado flex items-center justify-between border-l-4 border-green-500';
+          li.style.animation = `slideIn 0.32s ease-out ${i*0.05}s both`;
 
-        const left = document.createElement('div');
-        left.className = 'flex items-center gap-3';
+          const left = document.createElement('div');
+          left.className = 'flex items-center gap-3';
 
-        const icon = document.createElement('div');
-        icon.className = 'avatar-icon';
-        icon.innerHTML = `<svg class="w-5 h-5 text-gray-700 dark:text-gray-200" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a5 5 0 100-10 5 5 0 000 10zM2 18a8 8 0 0116 0H2z"/></svg>`;
+          const icon = document.createElement('div');
+          icon.className = 'avatar-icon';
+          icon.innerHTML = '<svg class="w-5 h-5 text-gray-700 dark:text-gray-200" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a5 5 0 100-10 5 5 0 000 10zM2 18a8 8 0 0116 0H2z"/></svg>';
 
-        const name = document.createElement('span');
-        name.className = 'font-semibold text-gray-900 dark:text-white nombre-empleado';
-        name.textContent = `${emp.nombre||''} ${emp.apellido_paterno||''} ${emp.apellido_materno||''}`;
+          const name = document.createElement('span');
+          name.className = 'font-semibold text-gray-900 dark:text-white nombre-empleado';
+          name.textContent = [emp.nombre||'', emp.apellido_paterno||'', emp.apellido_materno||''].join(' ').trim();
 
-        left.appendChild(icon);
-        left.appendChild(name);
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.dataset.id = emp.id;
 
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.dataset.id = emp.id;
+          if (esAsignados){
+            btn.className = 'btn btn-danger btn-sm';
+            btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3m-4 0h14"/></svg><span class="sr-only">Eliminar</span>';
+            btn.addEventListener('click', e=>{ e.stopPropagation(); eliminarEmpleado(emp.id); });
+          } else {
+            btn.className = 'btn btn-primary btn-sm';
+            btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span class="sr-only">Asignar</span>';
+            btn.addEventListener('click', e=>{ e.stopPropagation(); asignarEmpleado(emp.id); });
+          }
 
-        if(esAsignados){
-          btn.className = 'btn btn-danger btn-sm eliminar-btn';
-          btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3m-4 0h14"/></svg><span class="sr-only">Eliminar</span>`;
-          btn.addEventListener('click', (e) => { e.stopPropagation(); eliminarEmpleado(emp.id); });
-        }else{
-          btn.className = 'btn btn-primary btn-sm asignar-btn';
-          btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span class="sr-only">Asignar</span>`;
-          btn.addEventListener('click', (e) => { e.stopPropagation(); asignarEmpleado(emp.id); });
-        }
-
-        li.appendChild(left);
-        li.appendChild(btn);
-        if (elemLista) elemLista.appendChild(li);
-      });
-    }else{
-      if (listaEmpty) listaEmpty.classList.remove('hidden');
+          left.appendChild(icon); left.appendChild(name);
+          li.appendChild(left); li.appendChild(btn);
+          elemLista.appendChild(li);
+        });
+      } else {
+        if (listaEmpty) listaEmpty.classList.remove('hidden');
+      }
     }
-  }
 
-  function renderizarEmpleados(asignados, disponibles){
-    const elemListaAsignados = document.getElementById('lista-asignados');
-    const elemListaDisponibles = document.getElementById('lista-disponibles');
-    const emptyAsignados = document.getElementById('empty-asignados');
-    const emptyDisponibles = document.getElementById('empty-disponibles');
-    const countA = document.getElementById('count-asignados');
-    const countD = document.getElementById('count-disponibles');
+    function renderizarEmpleados(asignados, disponibles){
+      const elemListaAsignados  = document.getElementById('lista-asignados');
+      const elemListaDisponibles= document.getElementById('lista-disponibles');
+      const emptyAsignados      = document.getElementById('empty-asignados');
+      const emptyDisponibles    = document.getElementById('empty-disponibles');
+      const countA = document.getElementById('count-asignados');
+      const countD = document.getElementById('count-disponibles');
 
-    if (countA) countA.textContent = asignados.length;
-    if (countD) countD.textContent = disponibles.length;
-
-    crearListaEmpleados(elemListaAsignados, emptyAsignados, asignados, true);
-    crearListaEmpleados(elemListaDisponibles, emptyDisponibles, disponibles, false);
-  }
-
-  function actualizarListasEmpleados() {
-    const idsEmpleadosAsignadosCuadrante = (rendimientosAsignados[cuadranteActual] ?? [])
-    .map(rendimiento => rendimiento.usuario_id);
-
-    const empleadosAsignados = empleados.filter(emp =>
-      idsEmpleadosAsignadosCuadrante.includes(emp.id)
-    );
-
-    const idsEmpleadosAsignadosTotales = Object
-      .values(rendimientosAsignados ?? {})
-      .flatMap(arr => (Array.isArray(arr) ? arr : []))
-      .map(rendimiento => rendimiento.usuario_id);
-
-    const empleadosDisponibles = empleados.filter(
-      emp => !idsEmpleadosAsignadosTotales.includes(emp.id)
-    );
-
-    renderizarEmpleados(empleadosAsignados, empleadosDisponibles);
-    setBadgeCount(cuadranteActual, empleadosAsignados.length);
-  }
-
-  async function guardarEvaluacion(){
-    try{
-      const anio = document.getElementById('filtro-anio').value;
-      const mes = document.getElementById('filtro-mes').value;
-      const formData = new FormData();
-      formData.append('anio', anio);
-      formData.append('mes', mes);
-      formData.append('rendimientosAsignados', JSON.stringify(rendimientosAsignados));
-      formData.append('_token', CSRF_TOKEN);
-
-      const response = await fetch('/ninebox/guardar-evaluacion', {
-        method: 'POST',
-        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        credentials: 'same-origin',
-        body: formData
-      });
-
-      if(!response.ok){
-        const errorText = await response.text();
-        console.error('Error al guardar evaluación:', errorText);
-        alert('Error al guardar evaluación (código ' + response.status + ')');
+      if (!esSuperusuario()){
+        if (countA) countA.textContent = asignados.length;
+        if (countD) countD.textContent = disponibles.length;
+        crearListaEmpleados(elemListaAsignados, emptyAsignados, asignados, true);
+        crearListaEmpleados(elemListaDisponibles, emptyDisponibles, disponibles, false);
         return;
       }
 
-      await response.json();
-      alert('Evaluación guardada con éxito');
-      limpiarSessionStorage(); 
-    }catch(error){
-      console.error('Error fetch guardar evaluación:', error);
-      alert('Error al guardar evaluación: ' + error.message);
+      if (countA) countA.textContent = '';
+      if (countD) countD.textContent = '';
+
+      renderizarVistaSuperadmin(elemListaAsignados, emptyAsignados, asignados);
+
+      if (elemListaDisponibles) elemListaDisponibles.innerHTML = '';
+      if (emptyDisponibles) emptyDisponibles.classList.add('hidden');
     }
-  }
 
-  function recalcularBadges(){
-    for (let i = 1; i <= 9; i++) {
-      const lista = rendimientosAsignados[String(i)] ?? [];
-      setBadgeCount(i, Array.isArray(lista) ? lista.length : 0);
+    function actualizarListasEmpleados(){
+      const idsCuadrante = (rendimientosAsignados[cuadranteActual] ?? []).map(r => r.usuario_id);
+      const asignados = empleados.filter(e => idsCuadrante.includes(e.id));
+
+      const idsTotales = Object.values(rendimientosAsignados ?? {})
+        .flatMap(arr => Array.isArray(arr)?arr:[])
+        .map(r => r.usuario_id);
+
+      const disponibles = empleados.filter(e => !idsTotales.includes(e.id));
+
+      renderizarEmpleados(asignados, disponibles);
+      setBadgeCount(cuadranteActual, asignados.length);
     }
-  }
 
-  async function filtrarPorFecha(){
-    try{
-      console.log('aplicar');
-      const anio = document.getElementById('filtro-anio').value;
-      const mes = document.getElementById('filtro-mes').value;
-      
-      const formData = new FormData();
-      formData.append('anio', anio);
-      formData.append('mes', mes);
-      formData.append('_token', CSRF_TOKEN);
+    async function guardarEvaluacion(){
+      try{
+        const anio = document.getElementById('filtro-anio').value;
+        const mes  = document.getElementById('filtro-mes').value;
 
-      const response = await fetch('/ninebox/filtrar-rendimientos', {
-        method: 'POST',
-        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        credentials: 'same-origin',
-        body: formData
-      });
-      if(!response.ok){
-        const errorText = await response.text();
-        console.error('Error al filtrar evaluación:', errorText);
-        alert('Error al guardar evaluación (código ' + response.status + ')');
-        return;
+        const formData = new FormData();
+        formData.append('anio', anio);
+        formData.append('mes', mes);
+        formData.append('rendimientosAsignados', JSON.stringify(rendimientosAsignados));
+        formData.append('_token', CSRF_TOKEN);
+
+        const resp = await fetch('/ninebox/guardar-evaluacion', {
+          method:'POST', headers:{ 'Accept':'application/json', 'X-Requested-With':'XMLHttpRequest' },
+          credentials:'same-origin', body: formData
+        });
+        if (!resp.ok){ alert('Error al guardar evaluación ('+resp.status+')'); return; }
+        await resp.json();
+        alert('Evaluación guardada con éxito');
+        limpiarSessionStorage();
+      }catch(e){ alert('Error al guardar evaluación: '+e.message); }
+    }
+
+    function recalcularBadges(){
+      for (let i=1; i<=9; i++){
+        const lista = rendimientosAsignados[String(i)] ?? [];
+        setBadgeCount(i, Array.isArray(lista)?lista.length:0);
       }
-      const data = await response.json(); 
-      rendimientosAsignados = !Array.isArray(data?.asignacionesPorFecha) ? data?.asignacionesPorFecha : {};
-      console.log('rednimientosAsig', rendimientosAsignados);
-      recalcularBadges();
-      actualizarEstadisticas('recalcular');
-      guardarEnSessionStorage(); // GUARDAR DESPUÉS DE FILTRAR
-    }catch(error){
-      console.error('Error fetch filtrar evaluación:', error);
-      alert('Error al filtrar evaluación: ' + error.message);
     }
-  }
+
+    async function filtrarPorFecha(){
+      try{
+        const anio = document.getElementById('filtro-anio').value;
+        const mes  = document.getElementById('filtro-mes').value;
+
+        const formData = new FormData();
+        formData.append('anio', anio);
+        formData.append('mes', mes);
+        formData.append('_token', CSRF_TOKEN);
+
+        const resp = await fetch('/ninebox/filtrar-rendimientos', {
+          method:'POST', headers:{ 'Accept':'application/json', 'X-Requested-With':'XMLHttpRequest' },
+          credentials:'same-origin', body: formData
+        });
+        if (!resp.ok){ alert('Error al filtrar ('+resp.status+')'); return; }
+
+        const data = await resp.json();
+        rendimientosAsignados = !Array.isArray(data?.asignacionesPorFecha) ? data.asignacionesPorFecha : {};
+        recalcularBadges();
+        actualizarEstadisticas('recalcular');
+        guardarEnSessionStorage();
+      }catch(e){ alert('Error al filtrar: '+e.message); }
+    }
   </script>
 </x-app-layout>
