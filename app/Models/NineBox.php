@@ -13,7 +13,6 @@ class NineBox extends Model
         'descripcion',
     ];
 
-    // Relación con rendimientos
     public function rendimientos()
     {
         return $this->hasMany(Rendimiento::class, 'ninebox_id');
