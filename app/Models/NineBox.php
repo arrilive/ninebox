@@ -18,4 +18,8 @@ class NineBox extends Model
     {
         return $this->hasMany(Rendimiento::class, 'ninebox_id');
     }
+    public function encuestas()
+    {
+        return $this->hasMany(Encuesta::class, 'ninebox_id');
+    }
 }
