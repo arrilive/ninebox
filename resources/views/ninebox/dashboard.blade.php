@@ -81,15 +81,15 @@
               </div>
             </section>
 
-            {{-- CTA principal: Por evaluar --}}
-            @if (auth()->user()?->esJefe())
+            {{-- CTA principal: Evaluar empleados --}}
+            @if ($usuario->esJefe())
               <div class="mt-2 space-y-2">
                 <a
                   id="btn-por-evaluar"
                   href="{{ route('encuestas.empleados', ['anio' => request('anio', now()->year), 'mes' => request('mes', now()->month)]) }}"
                   class="btn btn-primary btn-block"
                 >
-                  Por evaluar
+                  Evaluar empleados
                 </a>
 
                 <p class="text-[13px] text-center mt-1 text-gray-700 dark:text-gray-400">
@@ -355,7 +355,7 @@
           if (e.target.id === 'modal-empleados') cerrarModal();
         });
 
-        // Actualizar link "Por evaluar" al cambiar periodo
+        // Actualizar link al cambiar periodo
         document.getElementById('filtro-anio')?.addEventListener('change', updatePorEvaluarLink);
         document.getElementById('filtro-mes')?.addEventListener('change', updatePorEvaluarLink);
         updatePorEvaluarLink();

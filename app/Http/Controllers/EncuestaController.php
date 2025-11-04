@@ -15,6 +15,16 @@ class EncuestaController extends Controller
     /**
      * GET /encuestas/empleados?anio=YYYY&mes=M
      * Lista empleados del jefe con filtros: evaluados, en_proceso, no_iniciados.
+     * 
+     * CAMBIOS REALIZADOS:
+     * - Siempre carga TODOS los empleados del período, ignorando el filtro server-side.
+     *   El JS maneja el filtrado y actualización de estados por borradores (sessionStorage).
+     * - Estados server-side: Solo 'evaluado' (encuesta cerrada) o 'no_iniciado' (cualquier cosa no cerrada).
+     *   No hay 'en_proceso' server-side, ya que los drafts puros no están en DB; JS lo detecta.
+     * - KPIs: Calculados server-side basados SOLO en DB (en_proceso=0 inicial). JS los recalcula
+     *   incluyendo drafts, pero solo cuando se muestra el sidebar ("Todos").
+     * - Si hay encuesta activa con respuestas parciales en DB (de submits previos), se marca como 'no_iniciado'
+     *   pero JS lo ajustará si hay draft más reciente. Esto es consistente.
      */
     public function listaEmpleados(Request $request)
     {
@@ -58,20 +68,20 @@ class EncuestaController extends Controller
             }
         }
 
-        // Clasifica estado: evaluado (cerrada), en_proceso (1..9), no_iniciado (0 o sin encuesta)
+        // Clasifica estado: SOLO 'evaluado' (cerrada) o 'no_iniciado' (abierta/parcial/sin encuesta)
+        // JS manejará 'en_proceso' vía drafts en sessionStorage.
         $empleados = $empleadosBase->map(function (User $e) use ($encuestasPeriodo, $progresos, $totalPreg) {
             $enc = $encuestasPeriodo->get($e->id);
             $contestadas = (int)($progresos[$e->id] ?? 0);
 
             if ($enc && $enc->activa === false) {
                 $estado = 'evaluado';
-            } elseif ($contestadas > 0 && $contestadas < $totalPreg) {
-                $estado = 'en_proceso';
-            } elseif ($contestadas >= $totalPreg) {
-                // Si por alguna razón quedó activa con 10/10, la tratamos como evaluada
-                $estado = 'evaluado';
+                $progreso = "{$contestadas}/{$totalPreg}"; // Debería ser full si cerrada
             } else {
+                // Cualquier cosa no cerrada: 'no_iniciado' (incluye parciales en DB o sin encuesta)
+                // JS chequeará drafts y lo cambiará a 'en_proceso' si filled > 0.
                 $estado = 'no_iniciado';
+                $progreso = $enc ? "{$contestadas}/{$totalPreg}" : "0/{$totalPreg}";
             }
 
             return [
@@ -79,21 +89,22 @@ class EncuestaController extends Controller
                 'nombre' => trim("{$e->nombre} {$e->apellido_paterno} {$e->apellido_materno}"),
                 'departamento_nombre' => optional($e->departamento)->nombre_departamento ?? 'Sin departamento',
                 'estado' => $estado,
-                'progreso' => "{$contestadas}/{$totalPreg}",
+                'progreso' => $progreso,
             ];
         });
 
-        // Filtros opcionales (?filtro=evaluado|en_proceso|no_iniciado)
-        $filtro = $request->query('filtro');
-        if (in_array($filtro, ['evaluado', 'en_proceso', 'no_iniciado'])) {
-            $empleados = $empleados->where('estado', $filtro)->values();
-        }
+        // ELIMINADO: No filtrar server-side. JS lo hace en applyStateFusion() basado en FILTRO.
+        // $filtro = $request->query('filtro');
+        // if (in_array($filtro, ['evaluado', 'en_proceso', 'no_iniciado'])) {
+        //     $empleados = $empleados->where('estado', $filtro)->values();
+        // }
 
-        // KPIs
-        $kpi_total       = $empleados->count();
+        // KPIs server-side: Basados en DB SOLO (en_proceso=0, ya que drafts son client-side)
+        // JS los recalculará correctamente al cargar (incluyendo drafts).
+        $kpi_total       = $empleadosBase->count(); // Total real de empleados
         $kpi_evaluados   = $empleados->where('estado', 'evaluado')->count();
-        $kpi_en_proceso  = $empleados->where('estado', 'en_proceso')->count();
-        $kpi_no_iniciado = $empleados->where('estado', 'no_iniciado')->count();
+        $kpi_en_proceso  = 0; // Server no sabe de drafts; JS ajustará
+        $kpi_no_iniciado = $kpi_total - $kpi_evaluados; // Incluye potenciales 'en_proceso'
 
         return view('encuestas.empleados-index', [
             'usuario'          => $user,
@@ -237,4 +248,3 @@ class EncuestaController extends Controller
             );
     }
 }
-    

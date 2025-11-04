@@ -22,8 +22,8 @@ Route::middleware(['auth'])->group(function () {
 
     // === Encuestas (CRUD completo movido desde Nine-Box) ===
     Route::middleware(['puede.evaluar'])->group(function () {
-
-        // Listado de empleados por periodo (botón "Por evaluar")
+        
+        // Listado de empleados por periodo (botón "Evaluar empleados")
         Route::get('/encuestas/empleados', [EncuestaController::class, 'listaEmpleados'])
             ->name('encuestas.empleados');
 
