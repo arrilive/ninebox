@@ -34,19 +34,25 @@ class DashboardController extends Controller
             });
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $usuario = Auth::user();
+        $usuario    = Auth::user();
 
-        if ($usuario->esEmpleado()) {
+        // Bloquea a empleados
+        if (method_exists($usuario, 'esEmpleado') && $usuario->esEmpleado()) {
             Auth::guard('web')->logout();
             return redirect()->route('login')
                 ->with('error', 'Sesión cerrada. No tienes acceso a esta sección.');
         }
 
+        // Periodo (tómalo del query si viene, si no usa actual)
+        $anioActual = (int) $request->query('anio', now()->year);
+        $mesActual  = (int) $request->query('mes',  now()->month);
+
+        // Empleados según rol
         $empleados = collect();
 
-        if ($usuario->esSuperusuario()) {
+        if (method_exists($usuario, 'esSuperusuario') && $usuario->esSuperusuario()) {
             $empleados = User::where('tipo_usuario_id', TipoUsuario::TIPOS_USUARIO['empleado'])
                 ->with('departamento')
                 ->get(['id', 'departamento_id', 'nombre', 'apellido_paterno', 'apellido_materno'])
@@ -60,54 +66,60 @@ class DashboardController extends Controller
                         'departamento_nombre' => $emp->departamento->nombre_departamento ?? 'Sin departamento',
                     ];
                 });
-        }
-
-        if ($usuario->esJefe()) {
+        } elseif (method_exists($usuario, 'esJefe') && $usuario->esJefe()) {
             $empleados = $this->empleadosDelDepartamento($usuario);
         }
 
+        $totalEmpleados = $empleados->count();
+
+        // Cuadrantes (si los usas para leyenda o nombres)
         $cuadrantes = NineBox::orderBy('posicion')->get();
 
-        $asignacionesActuales = Rendimiento::whereIn('usuario_id', $empleados->pluck('id'))
-            ->whereMonth('created_at', now()->month)
-            ->whereYear('created_at', now()->year)
-            ->with(['usuario.departamento', 'nineBox'])
-            ->get(['usuario_id', 'ninebox_id'])
+        // RENDIMIENTOS DEL PERIODO (lo que necesita el Blade)
+        $rendimientos = Rendimiento::with(['usuario', 'nineBox'])
+            ->whereIn('usuario_id', $empleados->pluck('id'))
+            ->whereYear('created_at', $anioActual)
+            ->whereMonth('created_at', $mesActual)
+            ->get();
+
+        // Agrupado para los contadores por cuadrante en la UI (1..9)
+        $asignacionesActuales = $rendimientos
             ->map(function ($asig) {
                 $u = $asig->usuario;
                 return [
-                    'usuario_id' => $asig->usuario_id,
-                    'ninebox_id' => $asig->ninebox_id,
-                    'nombre' => $u->nombre ?? '',
-                    'apellido_paterno' => $u->apellido_paterno ?? '',
-                    'apellido_materno' => $u->apellido_materno ?? '',
-                    'departamento_id' => $u->departamento_id ?? null,
-                    'departamento_nombre' => optional($u->departamento)->nombre_departamento ?? 'Sin departamento',
+                    'usuario_id'         => $asig->usuario_id,
+                    'ninebox_id'         => $asig->ninebox_id,
+                    'nombre'             => $u->nombre ?? '',
+                    'apellido_paterno'   => $u->apellido_paterno ?? '',
+                    'apellido_materno'   => $u->apellido_materno ?? '',
+                    'departamento_id'    => $u->departamento_id ?? null,
+                    'departamento_nombre'=> optional($u->departamento)->nombre_departamento ?? 'Sin departamento',
                 ];
             })
             ->groupBy('ninebox_id');
 
-        $empleadosEvaluados = $asignacionesActuales->flatten(1)
-            ->pluck('usuario_id')
-            ->unique()
-            ->values()
-            ->count();
+        // KPI evaluados (usuarios únicos con rendimiento en el periodo)
+        $empleadosEvaluados = $rendimientos->pluck('usuario_id')->unique()->count();
 
-        return view('ninebox.dashboard', compact(
-            'usuario',
-            'empleados',
-            'cuadrantes',
-            'asignacionesActuales',
-            'empleadosEvaluados'
-        ));
+        return view('ninebox.dashboard', [
+            'usuario'               => $usuario,
+            'anioActual'            => $anioActual,
+            'mesActual'             => $mesActual,
+            'empleados'             => $empleados,
+            'totalEmpleados'        => $totalEmpleados,
+            'cuadrantes'            => $cuadrantes,
+            'rendimientos'          => $rendimientos,          // <- lo que pedía tu Blade
+            'asignacionesActuales'  => $asignacionesActuales,  // contadores por cuadrante
+            'empleadosEvaluados'    => $empleadosEvaluados,
+        ]);
     }
 
     public function filtrarRendimientosPorFecha(Request $request)
     {
         $jefe = Auth::user();
 
-        $anio = $request->input('anio');
-        $mes  = $request->input('mes');
+        $anio = (int) $request->input('anio');
+        $mes  = (int) $request->input('mes');
 
         $empleados = $jefe->departamento_id
             ? $this->empleadosDelDepartamento($jefe)
@@ -117,17 +129,17 @@ class DashboardController extends Controller
             ->whereMonth('created_at', $mes)
             ->whereYear('created_at', $anio)
             ->with(['usuario.departamento', 'nineBox'])
-            ->get(['usuario_id', 'ninebox_id'])
+            ->get()
             ->map(function ($asig) {
                 $u = $asig->usuario;
                 return [
-                    'usuario_id' => $asig->usuario_id,
-                    'ninebox_id' => $asig->ninebox_id,
-                    'nombre' => $u->nombre ?? '',
-                    'apellido_paterno' => $u->apellido_paterno ?? '',
-                    'apellido_materno' => $u->apellido_materno ?? '',
-                    'departamento_id' => $u->departamento_id ?? null,
-                    'departamento_nombre' => optional($u->departamento)->nombre_departamento ?? 'Sin departamento',
+                    'usuario_id'         => $asig->usuario_id,
+                    'ninebox_id'         => $asig->ninebox_id,
+                    'nombre'             => $u->nombre ?? '',
+                    'apellido_paterno'   => $u->apellido_paterno ?? '',
+                    'apellido_materno'   => $u->apellido_materno ?? '',
+                    'departamento_id'    => $u->departamento_id ?? null,
+                    'departamento_nombre'=> optional($u->departamento)->nombre_departamento ?? 'Sin departamento',
                 ];
             })
             ->groupBy('ninebox_id');
@@ -140,11 +152,11 @@ class DashboardController extends Controller
     public function guardarEvaluacion(Request $request)
     {
         $jefe = Auth::user();
-        $anio = $request->input('anio');
-        $mes  = $request->input('mes');
+        $anio = (int) $request->input('anio');
+        $mes  = (int) $request->input('mes');
 
         $rendimientosAsignados = json_decode($request->input('rendimientosAsignados'));
-        $fecha = Carbon::createFromDate((int) $anio, (int) $mes, today()->day)->startOfDay();
+        $fecha = Carbon::createFromDate($anio, $mes, today()->day)->startOfDay();
 
         if ($fecha->lt(now()->startOfMonth())) {
             return response()->json([

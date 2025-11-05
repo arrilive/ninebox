@@ -4,56 +4,48 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Carbon\Carbon;
+
 use App\Models\User;
 use App\Models\Encuesta;
 use App\Models\Pregunta;
 use App\Models\Evaluacion;
-use Carbon\Carbon;
+use App\Models\Rendimiento;
 
 class EncuestaController extends Controller
 {
     /**
      * GET /encuestas/empleados?anio=YYYY&mes=M
-     * Lista empleados del jefe con filtros: evaluados, en_proceso, no_iniciados.
-     * 
-     * CAMBIOS REALIZADOS:
-     * - Siempre carga TODOS los empleados del período, ignorando el filtro server-side.
-     *   El JS maneja el filtrado y actualización de estados por borradores (sessionStorage).
-     * - Estados server-side: Solo 'evaluado' (encuesta cerrada) o 'no_iniciado' (cualquier cosa no cerrada).
-     *   No hay 'en_proceso' server-side, ya que los drafts puros no están en DB; JS lo detecta.
-     * - KPIs: Calculados server-side basados SOLO en DB (en_proceso=0 inicial). JS los recalcula
-     *   incluyendo drafts, pero solo cuando se muestra el sidebar ("Todos").
-     * - Si hay encuesta activa con respuestas parciales en DB (de submits previos), se marca como 'no_iniciado'
-     *   pero JS lo ajustará si hay draft más reciente. Esto es consistente.
      */
     public function listaEmpleados(Request $request)
     {
-        $user = $request->user(); // Jefe / Superusuario (ya validado por middleware)
+        $user = $request->user(); // Jefe / Superusuario
         $anio = (int)($request->query('anio', now()->year));
         $mes  = (int)($request->query('mes',  now()->month));
 
         // Total de preguntas (esperado 10)
         $totalPreg = (int) DB::table('preguntas')->count();
 
-        // Empleados del jefe (según tu relación definida en User)
-        // Si es superusuario, puedes listar todos; si es jefe, solo su departamento.
+        // Empleados según rol
         if (strtolower($user->tipoUsuario->tipo_nombre ?? '') === 'superusuario') {
             $empleadosBase = User::query()
                 ->whereHas('tipoUsuario', fn($q) => $q->whereRaw('LOWER(tipo_nombre) = ?', ['empleado']))
                 ->get();
         } else {
-            $empleadosBase = $user->empleados()->get(); // usa tu relación $jefe->empleados()
+            // relación $user->empleados() debe existir
+            $empleadosBase = $user->empleados()->get();
         }
 
-        // Trae encuestas del periodo (por created_at en año/mes)
+        // Encuestas del periodo
         $encuestasPeriodo = Encuesta::query()
+            ->whereIn('usuario_id', $empleadosBase->pluck('id'))
             ->whereYear('created_at', $anio)
             ->whereMonth('created_at', $mes)
-            ->whereIn('usuario_id', $empleadosBase->pluck('id'))
             ->get()
             ->keyBy('usuario_id');
 
-        // Progreso por encuesta: respuestas contadas
+        // Progreso por encuesta
         $progresos = [];
         if ($encuestasPeriodo->isNotEmpty()) {
             $resps = Evaluacion::query()
@@ -68,18 +60,15 @@ class EncuestaController extends Controller
             }
         }
 
-        // Clasifica estado: SOLO 'evaluado' (cerrada) o 'no_iniciado' (abierta/parcial/sin encuesta)
-        // JS manejará 'en_proceso' vía drafts en sessionStorage.
+        // Estado básico server-side
         $empleados = $empleadosBase->map(function (User $e) use ($encuestasPeriodo, $progresos, $totalPreg) {
             $enc = $encuestasPeriodo->get($e->id);
             $contestadas = (int)($progresos[$e->id] ?? 0);
 
             if ($enc && $enc->activa === false) {
                 $estado = 'evaluado';
-                $progreso = "{$contestadas}/{$totalPreg}"; // Debería ser full si cerrada
+                $progreso = "{$contestadas}/{$totalPreg}";
             } else {
-                // Cualquier cosa no cerrada: 'no_iniciado' (incluye parciales en DB o sin encuesta)
-                // JS chequeará drafts y lo cambiará a 'en_proceso' si filled > 0.
                 $estado = 'no_iniciado';
                 $progreso = $enc ? "{$contestadas}/{$totalPreg}" : "0/{$totalPreg}";
             }
@@ -93,18 +82,11 @@ class EncuestaController extends Controller
             ];
         });
 
-        // ELIMINADO: No filtrar server-side. JS lo hace en applyStateFusion() basado en FILTRO.
-        // $filtro = $request->query('filtro');
-        // if (in_array($filtro, ['evaluado', 'en_proceso', 'no_iniciado'])) {
-        //     $empleados = $empleados->where('estado', $filtro)->values();
-        // }
-
-        // KPIs server-side: Basados en DB SOLO (en_proceso=0, ya que drafts son client-side)
-        // JS los recalculará correctamente al cargar (incluyendo drafts).
-        $kpi_total       = $empleadosBase->count(); // Total real de empleados
+        // KPIs
+        $kpi_total       = $empleadosBase->count();
         $kpi_evaluados   = $empleados->where('estado', 'evaluado')->count();
-        $kpi_en_proceso  = 0; // Server no sabe de drafts; JS ajustará
-        $kpi_no_iniciado = $kpi_total - $kpi_evaluados; // Incluye potenciales 'en_proceso'
+        $kpi_en_proceso  = 0;
+        $kpi_no_iniciado = $kpi_total - $kpi_evaluados;
 
         return view('encuestas.empleados-index', [
             'usuario'          => $user,
@@ -129,7 +111,7 @@ class EncuestaController extends Controller
         $anio = (int)($request->query('anio', now()->year));
         $mes  = (int)($request->query('mes',  now()->month));
 
-        // Seguridad: si es Jefe, que solo pueda ver a sus empleados
+        // Seguridad: Jefe sólo su gente
         if (strtolower($user->tipoUsuario->tipo_nombre ?? '') !== 'superusuario') {
             $esDeMiDepto = $user->empleados()->where('id', $empleado)->exists();
             abort_unless($esDeMiDepto, 403);
@@ -146,11 +128,10 @@ class EncuestaController extends Controller
             $encuesta = Encuesta::create([
                 'usuario_id' => $empleado,
                 'activa'     => true,
-                // created_at define periodo (anio/mes), no dependemos de columnas extra
             ]);
         }
 
-        // Preguntas (10)
+        // Preguntas (ordenadas por categoría)
         $preguntas = Pregunta::orderBy('categoria')->orderBy('id')->get();
 
         // Respuestas existentes indexadas por pregunta_id
@@ -159,26 +140,27 @@ class EncuestaController extends Controller
             ->get()
             ->keyBy('pregunta_id');
 
-        // Progreso
-        $totalPreg = (int) $preguntas->count();
-        $contestadas = (int) $respuestas->count();
+        $totalPreguntas = (int) $preguntas->count();
+        $contestadas    = (int) $respuestas->count();
+        $empleadoObj    = User::select('id','nombre','apellido_paterno','apellido_materno')->findOrFail($empleado);
 
         return view('encuestas.encuesta-show', [
             'usuario'        => $user,
             'anio'           => $anio,
             'mes'            => $mes,
             'empleadoId'     => $empleado,
+            'empleado'       => $empleadoObj,
             'encuesta'       => $encuesta,
             'preguntas'      => $preguntas,
-            'respuestas'     => $respuestas, // para prellenar
-            'totalPreguntas' => $totalPreg,
+            'respuestas'     => $respuestas,
+            'totalPreguntas' => $totalPreguntas,
             'contestadas'    => $contestadas,
         ]);
     }
 
     /**
      * POST /encuestas/{empleado}?anio&mes
-     * Guarda respuestas (upsert por pregunta). Si quedan 10/10, recalcula totales, resuelve 9-box y cierra.
+     * Guarda y si completó, cierra y asigna 9-box -> Rendimiento.
      */
     public function submit(Request $request, int $empleado)
     {
@@ -186,13 +168,13 @@ class EncuestaController extends Controller
         $anio = (int)($request->query('anio', now()->year));
         $mes  = (int)($request->query('mes',  now()->month));
 
-        // Seguridad (jefe sólo su gente)
+        // Seguridad
         if (strtolower($user->tipoUsuario->tipo_nombre ?? '') !== 'superusuario') {
             $esDeMiDepto = $user->empleados()->where('id', $empleado)->exists();
             abort_unless($esDeMiDepto, 403);
         }
 
-        // Encuesta del periodo (debe existir; si no, crear)
+        // Encuesta del periodo (o crear)
         $encuesta = Encuesta::query()
             ->where('usuario_id', $empleado)
             ->whereYear('created_at', $anio)
@@ -206,14 +188,16 @@ class EncuestaController extends Controller
             ]);
         }
 
-        // Validación básica: respuestas.*.pregunta_id y respuestas.*.puntaje (0..5 por ejemplo)
+        // Validación: arreglo de respuestas indexado por pregunta_id
         $data = $request->validate([
             'respuestas'               => ['required', 'array'],
             'respuestas.*.pregunta_id' => ['required', 'integer', 'exists:preguntas,id'],
             'respuestas.*.puntaje'     => ['required', 'integer', 'min:0', 'max:5'],
             'respuestas.*.comentario'  => ['nullable', 'string'],
+            'comentario_final'         => ['nullable', 'string'],
         ]);
 
+        // Guardar/actualizar respuestas
         DB::transaction(function () use ($encuesta, $data) {
             foreach ($data['respuestas'] as $r) {
                 Evaluacion::updateOrCreate(
@@ -227,24 +211,85 @@ class EncuestaController extends Controller
         $totalPreg = (int) DB::table('preguntas')->count();
         $contestadas = (int) Evaluacion::where('encuesta_id', $encuesta->id)->count();
 
-        // Si completó 10/10 -> cerrar, recalcular totales y resolver 9-box
+        // Si completó, calculamos totales y resolvemos cuadrante
         if ($contestadas >= $totalPreg) {
-            $encuesta->recalcularTotales()->resolverCuadrante();
-            $encuesta->activa = false; // cerrada
-            $encuesta->save();
-        } else {
-            // Borrador sigue activo
-            if ($encuesta->activa === false) {
-                $encuesta->activa = true;
-                $encuesta->save();
+
+            // === Totales por eje (desempeño / potencial) ===
+            // Asumo que preguntas.categoria ∈ {'desempeno','potencial'}
+            $totales = Evaluacion::query()
+                ->join('preguntas','preguntas.id','=','evaluaciones.pregunta_id')
+                ->where('evaluaciones.encuesta_id', $encuesta->id)
+                ->selectRaw("
+                    SUM(CASE WHEN preguntas.categoria = 'desempeno' THEN evaluaciones.puntaje ELSE 0 END) AS total_desempeno,
+                    SUM(CASE WHEN preguntas.categoria = 'potencial'  THEN evaluaciones.puntaje ELSE 0 END) AS total_potencial
+                ")
+                ->first();
+
+            $totalDesempeno = (int)($totales->total_desempeno ?? 0);
+            $totalPotencial = (int)($totales->total_potencial ?? 0);
+
+            // === Resolver 9-box con bordes inclusivos ===
+            $regla = DB::table('reglas_ninebox')
+                ->where('min_desempeno', '<=', $totalDesempeno)
+                ->where('max_desempeno', '>=', $totalDesempeno)
+                ->where('min_potencial', '<=', $totalPotencial)
+                ->where('max_potencial', '>=', $totalPotencial)
+                ->first();
+
+            if (!$regla) {
+                // No hay regla para ese par → NO insertes rendimiento. Deja en borrador y avisa.
+                return redirect()
+                    ->route('encuestas.show', ['empleado' => $empleado, 'anio' => $anio, 'mes' => $mes])
+                    ->withErrors([
+                        'ninebox' => "No existe regla para desempeño={$totalDesempeno} y potencial={$totalPotencial}. Revisa los rangos en reglas_ninebox."
+                    ]);
             }
+
+            // Cerrar encuesta + persistir totales y ninebox_id
+            $encuesta->activa          = false;
+            $encuesta->enviada_en      = now();
+            $encuesta->ninebox_id      = (int)$regla->ninebox_id;
+            $encuesta->total_desempeno = $totalDesempeno;
+            $encuesta->total_potencial = $totalPotencial;
+
+            if (Schema::hasColumn('encuestas', 'anio'))    $encuesta->anio    = $anio;
+            if (Schema::hasColumn('encuestas', 'mes'))     $encuesta->mes     = $mes;
+            if (Schema::hasColumn('encuestas', 'jefe_id')) $encuesta->jefe_id = $user->id;
+
+            $encuesta->save();
+
+            // Sincroniza Rendimiento (una fila por usuario/mes). Solo si hay ninebox_id válido.
+            $periodo = Carbon::createFromDate((int)$anio, (int)$mes, 1)->startOfDay();
+
+            DB::transaction(function () use ($empleado, $anio, $mes, $encuesta, $periodo, $data) {
+                Rendimiento::where('usuario_id', $empleado)
+                    ->whereYear('created_at', $anio)
+                    ->whereMonth('created_at', $mes)
+                    ->delete();
+
+                $r = new Rendimiento([
+                    'usuario_id' => $empleado,
+                    'ninebox_id' => (int)$encuesta->ninebox_id, // garantizado no-nulo
+                    'comentario' => $data['comentario_final'] ?? null,
+                ]);
+                $r->timestamps = false;
+                $r->created_at = $periodo;
+                $r->save();
+            });
+
+            return redirect()
+                ->route('encuestas.empleados', ['anio' => $anio, 'mes' => $mes])
+                ->with('success', '¡Encuesta enviada y cerrada! 9-Box asignado correctamente.');
+        }
+
+        // Borrador
+        if ($encuesta->activa === false) {
+            $encuesta->activa = true;
+            $encuesta->save();
         }
 
         return redirect()
             ->route('encuestas.show', ['empleado' => $empleado, 'anio' => $anio, 'mes' => $mes])
-            ->with('status', $contestadas >= $totalPreg
-                ? 'Encuesta enviada y cerrada correctamente.'
-                : 'Borrador guardado. Puedes continuar después.'
-            );
+            ->with('status', 'Borrador guardado. Puedes continuar después.');
     }
 }

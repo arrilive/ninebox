@@ -115,22 +115,41 @@
 
               {{-- Botones por cuadrante (solo vista; badges dinámicos) --}}
               @php
-                // $asignacionesActuales debe ser: [cuadrante => Collection<empleado>]
-                $positions = [
-                  1=>['left'=>'17.5%','top'=>'18%','w'=>'23.5%','h'=>'25%'],
-                  2=>['left'=>'42.5%','top'=>'18%','w'=>'23.5%','h'=>'25%'],
-                  3=>['left'=>'67.5%','top'=>'18%','w'=>'23%','h'=>'25%'],
-                  4=>['left'=>'17.5%','top'=>'45%','w'=>'23.5%','h'=>'25%'],
-                  5=>['left'=>'42.5%','top'=>'45%','w'=>'23.5%','h'=>'25%'],
-                  6=>['left'=>'67.5%','top'=>'45%','w'=>'23%','h'=>'25%'],
-                  7=>['left'=>'17.5%','top'=>'72%','w'=>'23.5%','h'=>'25%'],
-                  8=>['left'=>'42.5%','top'=>'72%','w'=>'23.5%','h'=>'25%'],
-                  9=>['left'=>'67.5%','top'=>'72%','w'=>'23%','h'=>'25%']
-                ];
+                // === Mapa OFICIAL desde backend (preset activo) ===
+                $map = \App\Models\NineBox::posMap(); // id => ['row'=>1..3,'col'=>1..3]
+
+                // Coordenadas visuales por fila/col (ajusta si cambias tu imagen)
+                $lefts = [1 => '17.5%', 2 => '42.5%', 3 => '67.5%'];
+                $tops  = [1 => '18%',   2 => '45%',   3 => '72%'];
+                $W = ['default' => '23.5%', 'last' => '23%'];
+                $H = '25%';
+
+                // Construye posiciones por ID con base en row/col
+                $positions = [];
+                foreach ($map as $id => $rc) {
+                  $col = (int)$rc['col'];
+                  $row = (int)$rc['row'];
+                  $positions[$id] = [
+                    'left' => $lefts[$col],
+                    'top'  => $tops[$row],
+                    'w'    => $col === 3 ? $W['last'] : $W['default'],
+                    'h'    => $H,
+                  ];
+                }
+
+                // Orden de recorrido correcto: top→bottom, left→right
+                $order = collect($map)
+                  ->map(fn($rc, $id) => ['id'=>$id,'row'=>$rc['row'],'col'=>$rc['col']])
+                  ->sortBy([['row','asc'],['col','asc']])
+                  ->pluck('id')
+                  ->all();
               @endphp
 
-              @for ($i = 1; $i <= 9; $i++)
-                @php $pos = $positions[$i]; $count = ($asignacionesActuales[$i] ?? collect())->count(); @endphp
+              @foreach ($order as $i)
+                @php
+                  $pos   = $positions[$i];
+                  $count = collect($asignacionesActuales[$i] ?? [])->count(); // seguro para array/Collection
+                @endphp
                 <button type="button" class="cuadrante-btn btn-surface"
                         style="position:absolute; left: {{ $pos['left'] }}; top: {{ $pos['top'] }};
                                width: {{ $pos['w'] }}; height: {{ $pos['h'] }};"
@@ -140,7 +159,7 @@
                     <div class="cuadrante-badge">{{ $count }}</div>
                   @endif
                 </button>
-              @endfor
+              @endforeach
             </div>
           </div>
         </div>
@@ -250,12 +269,12 @@
         1:{title:"Diamante en bruto",desc:"Gran potencial con desempeño aún bajo."},
         2:{title:"Estrella en desarrollo",desc:"Potencial y desempeño en crecimiento."},
         3:{title:"Estrella",desc:"Alto desempeño y potencial."},
-        4:{title:"Bajo/Medio",desc:"Desempeño por debajo del esperado."},
-        5:{title:"Sólido",desc:"Cumple consistentemente, potencial medio."},
-        6:{title:"Elemento importante",desc:"Buen aporte, potencial incierto."},
-        7:{title:"Inaceptable",desc:"Requiere acción inmediata."},
-        8:{title:"Aceptable",desc:"Cumple lo básico."},
-        9:{title:"Personal clave",desc:"Confiable con buen desempeño."},
+        4:{title:"Mal empleado",desc:"Desempeño por debajo del esperado o desalineado al rol."},
+        5:{title:"Personal sólido",desc:"Cumple consistentemente; potencial medio."},
+        6:{title:"Elemento importante",desc:"Buen aporte, con posibilidad de asumir más."},
+        7:{title:"Inaceptable",desc:"Requiere acciones correctivas inmediatas."},
+        8:{title:"Aceptable",desc:"Cumple lo básico; espacio para crecer."},
+        9:{title:"Persona clave",desc:"Experto/a con alto desempeño sostenido."},
       };
 
       let lastTriggerBtn = null;
@@ -334,11 +353,9 @@
       }
 
       document.addEventListener('DOMContentLoaded', ()=>{
-        // Iniciar barra
         const bar = document.getElementById('avance-bar');
         if (bar){ bar.style.width = '{{ $pct }}%'; bar.textContent = '{{ $pct }}%'; }
 
-        // Click cuadrantes → modal solo lectura
         document.querySelectorAll('.cuadrante-btn').forEach(btn=>{
           btn.addEventListener('click', (e)=>{
             e.preventDefault();
@@ -348,14 +365,12 @@
           });
         });
 
-        // Cerrar modal
         document.getElementById('modal-backdrop')?.addEventListener('click', cerrarModal);
         document.getElementById('btn-cerrar-modal')?.addEventListener('click', cerrarModal);
         document.getElementById('modal-empleados')?.addEventListener('click', (e)=>{
           if (e.target.id === 'modal-empleados') cerrarModal();
         });
 
-        // Actualizar link al cambiar periodo
         document.getElementById('filtro-anio')?.addEventListener('change', updatePorEvaluarLink);
         document.getElementById('filtro-mes')?.addEventListener('change', updatePorEvaluarLink);
         updatePorEvaluarLink();
