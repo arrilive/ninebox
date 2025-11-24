@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\NineBox;
 use App\Models\Rendimiento;
 use App\Models\TipoUsuario;
+use App\Models\Departamento;
 
 class DashboardController extends Controller
 {
@@ -36,7 +37,7 @@ class DashboardController extends Controller
 
     public function index(Request $request)
     {
-        $usuario    = Auth::user();
+        $usuario = Auth::user();
 
         // Bloquea a empleados
         if (method_exists($usuario, 'esEmpleado') && $usuario->esEmpleado()) {
@@ -45,7 +46,6 @@ class DashboardController extends Controller
                 ->with('error', 'Sesión cerrada. No tienes acceso a esta sección.');
         }
 
-        // Periodo (tómalo del query si viene, si no usa actual)
         $anioActual = (int) $request->query('anio', now()->year);
         $mesActual  = (int) $request->query('mes',  now()->month);
 
@@ -72,34 +72,35 @@ class DashboardController extends Controller
 
         $totalEmpleados = $empleados->count();
 
-        // Cuadrantes (si los usas para leyenda o nombres)
         $cuadrantes = NineBox::orderBy('posicion')->get();
 
-        // RENDIMIENTOS DEL PERIODO (lo que necesita el Blade)
-        $rendimientos = Rendimiento::with(['usuario', 'nineBox'])
+        $rendimientos = Rendimiento::with(['usuario', 'nineBox', 'usuario.departamento'])
             ->whereIn('usuario_id', $empleados->pluck('id'))
             ->whereYear('created_at', $anioActual)
             ->whereMonth('created_at', $mesActual)
             ->get();
 
-        // Agrupado para los contadores por cuadrante en la UI (1..9)
+        // Estructura base por cuadrante
         $asignacionesActuales = $rendimientos
             ->map(function ($asig) {
                 $u = $asig->usuario;
                 return [
-                    'usuario_id'         => $asig->usuario_id,
-                    'ninebox_id'         => $asig->ninebox_id,
-                    'nombre'             => $u->nombre ?? '',
-                    'apellido_paterno'   => $u->apellido_paterno ?? '',
-                    'apellido_materno'   => $u->apellido_materno ?? '',
-                    'departamento_id'    => $u->departamento_id ?? null,
-                    'departamento_nombre'=> optional($u->departamento)->nombre_departamento ?? 'Sin departamento',
+                    'usuario_id'          => $asig->usuario_id,
+                    'ninebox_id'          => $asig->ninebox_id,
+                    'nombre'              => $u->nombre ?? '',
+                    'apellido_paterno'    => $u->apellido_paterno ?? '',
+                    'apellido_materno'    => $u->apellido_materno ?? '',
+                    'departamento_id'     => $u->departamento_id ?? null,
+                    'departamento_nombre' => optional($u->departamento)->nombre_departamento ?? 'Sin departamento',
                 ];
             })
             ->groupBy('ninebox_id');
 
         // KPI evaluados (usuarios únicos con rendimiento en el periodo)
         $empleadosEvaluados = $rendimientos->pluck('usuario_id')->unique()->count();
+
+        // Bandera para el Blade (render especial del modal)
+        $esSuper = method_exists($usuario, 'esSuperusuario') && $usuario->esSuperusuario();
 
         return view('ninebox.dashboard', [
             'usuario'               => $usuario,
@@ -108,9 +109,10 @@ class DashboardController extends Controller
             'empleados'             => $empleados,
             'totalEmpleados'        => $totalEmpleados,
             'cuadrantes'            => $cuadrantes,
-            'rendimientos'          => $rendimientos,          // <- lo que pedía tu Blade
-            'asignacionesActuales'  => $asignacionesActuales,  // contadores por cuadrante
+            'rendimientos'          => $rendimientos,
+            'asignacionesActuales'  => $asignacionesActuales,
             'empleadosEvaluados'    => $empleadosEvaluados,
+            'esSuper'               => $esSuper, // ← clave para modal solo-lectura agrupado
         ]);
     }
 
@@ -121,9 +123,14 @@ class DashboardController extends Controller
         $anio = (int) $request->input('anio');
         $mes  = (int) $request->input('mes');
 
-        $empleados = $jefe->departamento_id
-            ? $this->empleadosDelDepartamento($jefe)
-            : collect();
+        // Si es superusuario, ve todos; si es jefe, solo su depto
+        if (method_exists($jefe, 'esSuperusuario') && $jefe->esSuperusuario()) {
+            $empleados = User::where('tipo_usuario_id', TipoUsuario::TIPOS_USUARIO['empleado'])->get(['id']);
+        } else {
+            $empleados = $jefe->departamento_id
+                ? $this->empleadosDelDepartamento($jefe)
+                : collect();
+        }
 
         $asignacionesPorFecha = Rendimiento::whereIn('usuario_id', $empleados->pluck('id'))
             ->whereMonth('created_at', $mes)
@@ -133,13 +140,13 @@ class DashboardController extends Controller
             ->map(function ($asig) {
                 $u = $asig->usuario;
                 return [
-                    'usuario_id'         => $asig->usuario_id,
-                    'ninebox_id'         => $asig->ninebox_id,
-                    'nombre'             => $u->nombre ?? '',
-                    'apellido_paterno'   => $u->apellido_paterno ?? '',
-                    'apellido_materno'   => $u->apellido_materno ?? '',
-                    'departamento_id'    => $u->departamento_id ?? null,
-                    'departamento_nombre'=> optional($u->departamento)->nombre_departamento ?? 'Sin departamento',
+                    'usuario_id'          => $asig->usuario_id,
+                    'ninebox_id'          => $asig->ninebox_id,
+                    'nombre'              => $u->nombre ?? '',
+                    'apellido_paterno'    => $u->apellido_paterno ?? '',
+                    'apellido_materno'    => $u->apellido_materno ?? '',
+                    'departamento_id'     => $u->departamento_id ?? null,
+                    'departamento_nombre' => optional($u->departamento)->nombre_departamento ?? 'Sin departamento',
                 ];
             })
             ->groupBy('ninebox_id');

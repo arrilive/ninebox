@@ -15,29 +15,23 @@ use App\Models\Rendimiento;
 
 class EncuestaController extends Controller
 {
-    /**
-     * GET /encuestas/empleados?anio=YYYY&mes=M
-     */
+    /** Lista empleados para el periodo seleccionado y computa estado/progreso básico. */
     public function listaEmpleados(Request $request)
     {
-        $user = $request->user(); // Jefe / Superusuario
+        $user = $request->user();
         $anio = (int)($request->query('anio', now()->year));
         $mes  = (int)($request->query('mes',  now()->month));
 
-        // Total de preguntas (esperado 10)
         $totalPreg = (int) DB::table('preguntas')->count();
 
-        // Empleados según rol
-        if (strtolower($user->tipoUsuario->tipo_nombre ?? '') === 'superusuario') {
+        if (method_exists($user, 'esSuperusuario') && $user->esSuperusuario()) {
             $empleadosBase = User::query()
                 ->whereHas('tipoUsuario', fn($q) => $q->whereRaw('LOWER(tipo_nombre) = ?', ['empleado']))
                 ->get();
         } else {
-            // relación $user->empleados() debe existir
             $empleadosBase = $user->empleados()->get();
         }
 
-        // Encuestas del periodo
         $encuestasPeriodo = Encuesta::query()
             ->whereIn('usuario_id', $empleadosBase->pluck('id'))
             ->whereYear('created_at', $anio)
@@ -45,7 +39,6 @@ class EncuestaController extends Controller
             ->get()
             ->keyBy('usuario_id');
 
-        // Progreso por encuesta
         $progresos = [];
         if ($encuestasPeriodo->isNotEmpty()) {
             $resps = Evaluacion::query()
@@ -60,7 +53,6 @@ class EncuestaController extends Controller
             }
         }
 
-        // Estado básico server-side
         $empleados = $empleadosBase->map(function (User $e) use ($encuestasPeriodo, $progresos, $totalPreg) {
             $enc = $encuestasPeriodo->get($e->id);
             $contestadas = (int)($progresos[$e->id] ?? 0);
@@ -82,7 +74,6 @@ class EncuestaController extends Controller
             ];
         });
 
-        // KPIs
         $kpi_total       = $empleadosBase->count();
         $kpi_evaluados   = $empleados->where('estado', 'evaluado')->count();
         $kpi_en_proceso  = 0;
@@ -101,23 +92,19 @@ class EncuestaController extends Controller
         ]);
     }
 
-    /**
-     * GET /encuestas/{empleado}?anio&mes
-     * Muestra la encuesta (crea borrador si no existe) + preguntas y respuestas.
-     */
+    /** Muestra la encuesta; crea borrador si no existe. */
     public function show(Request $request, int $empleado)
     {
         $user = $request->user();
         $anio = (int)($request->query('anio', now()->year));
         $mes  = (int)($request->query('mes',  now()->month));
 
-        // Seguridad: Jefe sólo su gente
-        if (strtolower($user->tipoUsuario->tipo_nombre ?? '') !== 'superusuario') {
+        // Solo jefes se limitan a sus empleados; superadmin ve todo
+        if (!(method_exists($user, 'esSuperusuario') && $user->esSuperusuario())) {
             $esDeMiDepto = $user->empleados()->where('id', $empleado)->exists();
             abort_unless($esDeMiDepto, 403);
         }
 
-        // Encuesta del periodo o crear borrador activa
         $encuesta = Encuesta::query()
             ->where('usuario_id', $empleado)
             ->whereYear('created_at', $anio)
@@ -131,36 +118,44 @@ class EncuestaController extends Controller
             ]);
         }
 
-        // Preguntas (ordenadas por categoría)
         $preguntas = Pregunta::orderBy('categoria')->orderBy('id')->get();
 
-        // Respuestas existentes indexadas por pregunta_id
         $respuestas = Evaluacion::query()
             ->where('encuesta_id', $encuesta->id)
             ->get()
             ->keyBy('pregunta_id');
 
-        $totalPreguntas = (int) $preguntas->count();
-        $contestadas    = (int) $respuestas->count();
-        $empleadoObj    = User::select('id','nombre','apellido_paterno','apellido_materno')->findOrFail($empleado);
+        $totalPreguntas    = (int) $preguntas->count();
+        $contestadas       = (int) $respuestas->count();
+
+        $empleadoObj       = User::select('id','nombre','apellido_paterno','apellido_materno')->findOrFail($empleado);
+
+        $comentarioGeneral = null;
+        if (Schema::hasColumn('encuestas', 'notas_privadas')) {
+            $comentarioGeneral = $encuesta->notas_privadas;
+        }
+
+        $soloLectura = ($encuesta->activa === false) || session('ya_enviada', false);
 
         return view('encuestas.encuesta-show', [
-            'usuario'        => $user,
-            'anio'           => $anio,
-            'mes'            => $mes,
-            'empleadoId'     => $empleado,
-            'empleado'       => $empleadoObj,
-            'encuesta'       => $encuesta,
-            'preguntas'      => $preguntas,
-            'respuestas'     => $respuestas,
-            'totalPreguntas' => $totalPreguntas,
-            'contestadas'    => $contestadas,
+            'usuario'           => $user,
+            'anio'              => $anio,
+            'mes'               => $mes,
+            'empleadoId'        => $empleado,
+            'empleado'          => $empleadoObj,
+            'encuesta'          => $encuesta,
+            'preguntas'         => $preguntas,
+            'respuestas'        => $respuestas,
+            'totalPreguntas'    => $totalPreguntas,
+            'contestadas'       => $contestadas,
+            'comentarioGeneral' => $comentarioGeneral,
+            'soloLectura'       => $soloLectura,
         ]);
     }
 
     /**
-     * POST /encuestas/{empleado}?anio&mes
-     * Guarda y si completó, cierra y asigna 9-box -> Rendimiento.
+     * Guarda borrador o envía; al completar cierra y asigna ninebox.
+     * El comentario final se almacena en encuestas.notas_privadas.
      */
     public function submit(Request $request, int $empleado)
     {
@@ -168,13 +163,12 @@ class EncuestaController extends Controller
         $anio = (int)($request->query('anio', now()->year));
         $mes  = (int)($request->query('mes',  now()->month));
 
-        // Seguridad
-        if (strtolower($user->tipoUsuario->tipo_nombre ?? '') !== 'superusuario') {
+        // Solo jefes se limitan a sus empleados; superadmin ve todo
+        if (!(method_exists($user, 'esSuperusuario') && $user->esSuperusuario())) {
             $esDeMiDepto = $user->empleados()->where('id', $empleado)->exists();
             abort_unless($esDeMiDepto, 403);
         }
 
-        // Encuesta del periodo (o crear)
         $encuesta = Encuesta::query()
             ->where('usuario_id', $empleado)
             ->whereYear('created_at', $anio)
@@ -188,34 +182,71 @@ class EncuestaController extends Controller
             ]);
         }
 
-        // Validación: arreglo de respuestas indexado por pregunta_id
+        if ($encuesta->activa === false) {
+            // Ya está cerrada: vuelve a la vista (modo lectura)
+            return redirect()
+                ->route('encuestas.show', ['empleado' => $empleado, 'anio' => $anio, 'mes' => $mes])
+                ->with('alert', [
+                    'type'  => 'info',
+                    'title' => 'Encuesta ya enviada',
+                    'text'  => 'Esta evaluación ya había sido enviada. Solo puedes consultarla en modo lectura.',
+                ]);
+        }
+
+        // Normalizar payload: "" -> null en puntajes
+        $payload = $request->all();
+        if (isset($payload['respuestas']) && is_array($payload['respuestas'])) {
+            foreach ($payload['respuestas'] as $idx => $r) {
+                if (array_key_exists('puntaje', $r) && $r['puntaje'] === '') {
+                    $payload['respuestas'][$idx]['puntaje'] = null;
+                }
+            }
+        }
+        $request->replace($payload);
+
         $data = $request->validate([
             'respuestas'               => ['required', 'array'],
             'respuestas.*.pregunta_id' => ['required', 'integer', 'exists:preguntas,id'],
-            'respuestas.*.puntaje'     => ['required', 'integer', 'min:0', 'max:5'],
+            'respuestas.*.puntaje'     => ['nullable', 'integer', 'between:1,5'],
             'respuestas.*.comentario'  => ['nullable', 'string'],
-            'comentario_final'         => ['nullable', 'string'],
+            'comentario_general'       => ['nullable', 'string', 'max:1000'],
         ]);
 
-        // Guardar/actualizar respuestas
+        // Guardar comentario general (si existe la columna)
+        if (Schema::hasColumn('encuestas', 'notas_privadas')) {
+            $encuesta->notas_privadas = $data['comentario_general'] ?? null;
+            $encuesta->save();
+        }
+
+        // Guardar/actualizar respuestas 
         DB::transaction(function () use ($encuesta, $data) {
             foreach ($data['respuestas'] as $r) {
+                $preguntaId = (int)$r['pregunta_id'];
+                $puntaje    = $r['puntaje'] ?? null;
+
+                if ($puntaje === null) {
+                    // Si el usuario desmarcó la respuesta, la eliminamos
+                    Evaluacion::where('encuesta_id', $encuesta->id)
+                        ->where('pregunta_id', $preguntaId)
+                        ->delete();
+                    continue;
+                }
+
                 Evaluacion::updateOrCreate(
-                    ['encuesta_id' => $encuesta->id, 'pregunta_id' => (int)$r['pregunta_id']],
-                    ['puntaje' => (int)$r['puntaje'], 'comentario' => $r['comentario'] ?? null]
+                    ['encuesta_id' => $encuesta->id, 'pregunta_id' => $preguntaId],
+                    [
+                        'puntaje'    => (int)$puntaje,
+                        'comentario' => $r['comentario'] ?? null,
+                    ]
                 );
             }
         });
 
-        // Recalcular progreso
-        $totalPreg = (int) DB::table('preguntas')->count();
+        $totalPreg   = (int) DB::table('preguntas')->count();
         $contestadas = (int) Evaluacion::where('encuesta_id', $encuesta->id)->count();
 
-        // Si completó, calculamos totales y resolvemos cuadrante
+        // Si está completa => cerrar y ENVIAR
         if ($contestadas >= $totalPreg) {
-
-            // === Totales por eje (desempeño / potencial) ===
-            // Asumo que preguntas.categoria ∈ {'desempeno','potencial'}
             $totales = Evaluacion::query()
                 ->join('preguntas','preguntas.id','=','evaluaciones.pregunta_id')
                 ->where('evaluaciones.encuesta_id', $encuesta->id)
@@ -228,7 +259,6 @@ class EncuestaController extends Controller
             $totalDesempeno = (int)($totales->total_desempeno ?? 0);
             $totalPotencial = (int)($totales->total_potencial ?? 0);
 
-            // === Resolver 9-box con bordes inclusivos ===
             $regla = DB::table('reglas_ninebox')
                 ->where('min_desempeno', '<=', $totalDesempeno)
                 ->where('max_desempeno', '>=', $totalDesempeno)
@@ -237,15 +267,14 @@ class EncuestaController extends Controller
                 ->first();
 
             if (!$regla) {
-                // No hay regla para ese par → NO insertes rendimiento. Deja en borrador y avisa.
                 return redirect()
                     ->route('encuestas.show', ['empleado' => $empleado, 'anio' => $anio, 'mes' => $mes])
                     ->withErrors([
-                        'ninebox' => "No existe regla para desempeño={$totalDesempeno} y potencial={$totalPotencial}. Revisa los rangos en reglas_ninebox."
+                        'ninebox' => "No existe regla para desempeño={$totalDesempeno} y potencial={$totalPotencial}. Revisa reglas_ninebox."
                     ]);
             }
 
-            // Cerrar encuesta + persistir totales y ninebox_id
+            // Cerrar encuesta y escribir métricas
             $encuesta->activa          = false;
             $encuesta->enviada_en      = now();
             $encuesta->ninebox_id      = (int)$regla->ninebox_id;
@@ -258,10 +287,9 @@ class EncuestaController extends Controller
 
             $encuesta->save();
 
-            // Sincroniza Rendimiento (una fila por usuario/mes). Solo si hay ninebox_id válido.
             $periodo = Carbon::createFromDate((int)$anio, (int)$mes, 1)->startOfDay();
 
-            DB::transaction(function () use ($empleado, $anio, $mes, $encuesta, $periodo, $data) {
+            DB::transaction(function () use ($empleado, $anio, $mes, $encuesta, $periodo) {
                 Rendimiento::where('usuario_id', $empleado)
                     ->whereYear('created_at', $anio)
                     ->whereMonth('created_at', $mes)
@@ -269,27 +297,53 @@ class EncuestaController extends Controller
 
                 $r = new Rendimiento([
                     'usuario_id' => $empleado,
-                    'ninebox_id' => (int)$encuesta->ninebox_id, // garantizado no-nulo
-                    'comentario' => $data['comentario_final'] ?? null,
+                    'ninebox_id' => (int)$encuesta->ninebox_id,
                 ]);
                 $r->timestamps = false;
                 $r->created_at = $periodo;
                 $r->save();
             });
 
+            // Texto de cuadrante para la alerta
+            $cuadranteId = (int) $encuesta->ninebox_id;
+
+            $nombresCuadrantes = [
+                6 => 'Diamante en bruto',
+                8 => 'Estrella en desarrollo',
+                9 => 'Estrella',
+                2 => 'Mal empleado',
+                5 => 'Personal sólido',
+                7 => 'Elemento importante',
+                1 => 'Inaceptable',
+                3 => 'Aceptable',
+                4 => 'Personal clave',
+            ];
+
+            $textoCuadrante = $nombresCuadrantes[$cuadranteId] ?? "Cuadrante {$cuadranteId}";
+
             return redirect()
                 ->route('encuestas.empleados', ['anio' => $anio, 'mes' => $mes])
-                ->with('success', '¡Encuesta enviada y cerrada! 9-Box asignado correctamente.');
+                ->with('alert', [
+                    'type'          => 'success',
+                    'title'         => 'Encuesta enviada',
+                    'text'          => "La evaluación se envió correctamente.<br>El colaborador fue asignado al cuadrante: <strong>{$textoCuadrante}</strong>.",
+                    'quadrant_id'   => $cuadranteId,
+                    'quadrant_name' => $textoCuadrante,
+                ]);
+
         }
 
-        // Borrador
         if ($encuesta->activa === false) {
             $encuesta->activa = true;
             $encuesta->save();
         }
 
         return redirect()
-            ->route('encuestas.show', ['empleado' => $empleado, 'anio' => $anio, 'mes' => $mes])
-            ->with('status', 'Borrador guardado. Puedes continuar después.');
+            ->route('encuestas.empleados', ['anio' => $anio, 'mes' => $mes])
+            ->with('alert', [
+                'type'  => 'success',
+                'title' => 'Borrador guardado',
+                'text'  => 'Tus respuestas se guardaron correctamente. Puedes continuar la evaluación más tarde.',
+            ]);
     }
 }

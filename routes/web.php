@@ -10,20 +10,20 @@ Route::get('/', function () {
     if (Auth::check()) {
         return redirect()->route('ninebox.dashboard');
     }
-    return view('welcome');
+    return redirect()->route('login');
 });
 
 // === Rutas autenticadas ===
 Route::middleware(['auth'])->group(function () {
 
-    // === Nine-Box (Vista principal, solo lectura) ===
+    // === Nine-Box (Vista principal) ===
     Route::get('/ninebox/dashboard', [DashboardController::class, 'index'])
         ->name('ninebox.dashboard');
 
     // === Encuestas (CRUD completo movido desde Nine-Box) ===
     Route::middleware(['puede.evaluar'])->group(function () {
         
-        // Listado de empleados por periodo (botón "Evaluar empleados")
+        // Listado de empleados)
         Route::get('/encuestas/empleados', [EncuestaController::class, 'listaEmpleados'])
             ->name('encuestas.empleados');
 
