@@ -15,7 +15,7 @@ class JefesYEmpleadosSeeder extends Seeder
             ['id' => 1, 'tipo_nombre' => 'Superadmin', 'descripcion' => 'Acceso total al sistema'],
             ['id' => 2, 'tipo_nombre' => 'Jefe',       'descripcion' => 'Gestión de equipos y evaluaciones'],
             ['id' => 3, 'tipo_nombre' => 'Empleado',   'descripcion' => 'Acceso estándar a funcionalidades'],
-            ['id' => 4, 'tipo_nombre' => 'RRHH', 'descripcion' => 'Gestión de personal'],
+            ['id' => 4, 'tipo_nombre' => 'Dueño', 'descripcion' => 'Propietario con visión global de los jefes'],
         ];
 
         // Inserta/actualiza por ID (no duplica si ya existen)
@@ -25,13 +25,10 @@ class JefesYEmpleadosSeeder extends Seeder
             ['tipo_nombre', 'descripcion']      // columnas a actualizar si ya existe
         );
 
-        // (MySQL/MariaDB) Ajusta AUTO_INCREMENT al siguiente ID libre
-        // Si usas PostgreSQL, omite esto (ver nota abajo).
         $maxId = DB::table('tipos_usuarios')->max('id') ?? 0;
         try {
             DB::statement('ALTER TABLE tipos_usuarios AUTO_INCREMENT = ' . ($maxId + 1));
         } catch (\Throwable $e) {
-            // Silencioso: por si no es MySQL/MariaDB o no aplica
         }
     
        $areas = collect([
@@ -234,7 +231,7 @@ class JefesYEmpleadosSeeder extends Seeder
             }
         }
 
-        // Crear superusuario si no existe
+        // Crear admin si no existe
         $super = DB::table('usuarios')->where('user_name', 'superadmin')->first();
         if (!$super) {
             DB::table('usuarios')->insert([
@@ -245,9 +242,27 @@ class JefesYEmpleadosSeeder extends Seeder
                 'apellido_paterno' => "Super",
                 'apellido_materno' => "Admin",
                 'telefono' => null,
-                'tipo_usuario_id' => 1, // superusuario
+                'tipo_usuario_id' => 1, // admin
                 'created_at' => now(),
                 'updated_at' => now(),
+            ]);
+        }
+
+        // Crear dueño si no existe
+        $dueno = DB::table('usuarios')->where('user_name', 'BPTGroup')->first();
+
+        if (!$dueno) {
+            DB::table('usuarios')->insert([
+                'user_name'       => 'BPTGroup',
+                'password'        => Hash::make('BTPGroup'),
+                'correo'          => 'BPTGroup@ninebox.com',
+                'nombre'          => 'Dueño',
+                'apellido_paterno'=> 'General',
+                'apellido_materno'=> null,
+                'telefono'        => null,
+                'tipo_usuario_id' => 4, // Dueño
+                'created_at'      => now(),
+                'updated_at'      => now(),
             ]);
         }
     }

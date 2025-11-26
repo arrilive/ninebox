@@ -37,13 +37,12 @@ class DashboardController extends Controller
 
     public function index(Request $request)
     {
-        $usuario = Auth::user();
+        $usuario = $request->user();
 
-        // Bloquea a empleados
+        // Evitar empleados
         if (method_exists($usuario, 'esEmpleado') && $usuario->esEmpleado()) {
-            Auth::guard('web')->logout();
-            return redirect()->route('login')
-                ->with('error', 'Sesión cerrada. No tienes acceso a esta sección.');
+            Auth::logout();
+            return redirect()->route('login')->withErrors(['correo' => 'No tienes permiso para acceder.']);
         }
 
         $anioActual = (int) $request->query('anio', now()->year);
@@ -52,21 +51,28 @@ class DashboardController extends Controller
         // Empleados según rol
         $empleados = collect();
 
-        if (method_exists($usuario, 'esSuperusuario') && $usuario->esSuperusuario()) {
+        $esSuper = method_exists($usuario, 'esSuperusuario') && $usuario->esSuperusuario();
+        $esDueno = method_exists($usuario, 'esDueno') && $usuario->esDueno();
+        $esJefe  = method_exists($usuario, 'esJefe') && $usuario->esJefe();
+
+        if ($esSuper || $esDueno) {
+            // Superadmin y Dueño: ven TODOS los empleados
             $empleados = User::where('tipo_usuario_id', TipoUsuario::TIPOS_USUARIO['empleado'])
                 ->with('departamento')
                 ->get(['id', 'departamento_id', 'nombre', 'apellido_paterno', 'apellido_materno'])
                 ->map(function ($emp) {
                     return [
-                        'id' => $emp->id,
-                        'nombre' => $emp->nombre,
-                        'apellido_paterno' => $emp->apellido_paterno,
-                        'apellido_materno' => $emp->apellido_materno,
-                        'departamento_id' => $emp->departamento_id,
+                        'id'                  => $emp->id,
+                        'nombre'              => $emp->nombre,
+                        'apellido_paterno'    => $emp->apellido_paterno,
+                        'apellido_materno'    => $emp->apellido_materno,
+                        'departamento_id'     => $emp->departamento_id,
                         'departamento_nombre' => $emp->departamento->nombre_departamento ?? 'Sin departamento',
                     ];
                 });
-        } elseif (method_exists($usuario, 'esJefe') && $usuario->esJefe()) {
+
+        } elseif ($esJefe) {
+            // Jefe: ve a sus empleados del departamento
             $empleados = $this->empleadosDelDepartamento($usuario);
         }
 
@@ -80,7 +86,6 @@ class DashboardController extends Controller
             ->whereMonth('created_at', $mesActual)
             ->get();
 
-        // Estructura base por cuadrante
         $asignacionesActuales = $rendimientos
             ->map(function ($asig) {
                 $u = $asig->usuario;
@@ -96,23 +101,21 @@ class DashboardController extends Controller
             })
             ->groupBy('ninebox_id');
 
-        // KPI evaluados (usuarios únicos con rendimiento en el periodo)
         $empleadosEvaluados = $rendimientos->pluck('usuario_id')->unique()->count();
 
-        // Bandera para el Blade (render especial del modal)
-        $esSuper = method_exists($usuario, 'esSuperusuario') && $usuario->esSuperusuario();
+        $esSuper = $esSuper;
 
         return view('ninebox.dashboard', [
-            'usuario'               => $usuario,
-            'anioActual'            => $anioActual,
-            'mesActual'             => $mesActual,
-            'empleados'             => $empleados,
-            'totalEmpleados'        => $totalEmpleados,
-            'cuadrantes'            => $cuadrantes,
-            'rendimientos'          => $rendimientos,
-            'asignacionesActuales'  => $asignacionesActuales,
-            'empleadosEvaluados'    => $empleadosEvaluados,
-            'esSuper'               => $esSuper, // ← clave para modal solo-lectura agrupado
+            'usuario'              => $usuario,
+            'anioActual'           => $anioActual,
+            'mesActual'            => $mesActual,
+            'empleados'            => $empleados,
+            'totalEmpleados'       => $totalEmpleados,
+            'cuadrantes'           => $cuadrantes,
+            'rendimientos'         => $rendimientos,
+            'asignacionesActuales' => $asignacionesActuales,
+            'empleadosEvaluados'   => $empleadosEvaluados,
+            'esSuper'              => $esSuper,
         ]);
     }
 
@@ -123,10 +126,15 @@ class DashboardController extends Controller
         $anio = (int) $request->input('anio');
         $mes  = (int) $request->input('mes');
 
-        // Si es superusuario, ve todos; si es jefe, solo su depto
-        if (method_exists($jefe, 'esSuperusuario') && $jefe->esSuperusuario()) {
+        // Si es admin o dueño, ve todos; si es jefe, solo su depto
+        $esSuper = method_exists($jefe, 'esSuperusuario') && $jefe->esSuperusuario();
+        $esDueno = method_exists($jefe, 'esDueno') && $jefe->esDueno();
+
+        if ($esSuper || $esDueno) {
+            // Superadmin y Dueño: ven todos los empleados
             $empleados = User::where('tipo_usuario_id', TipoUsuario::TIPOS_USUARIO['empleado'])->get(['id']);
         } else {
+            // Jefe: solo su depto
             $empleados = $jefe->departamento_id
                 ? $this->empleadosDelDepartamento($jefe)
                 : collect();

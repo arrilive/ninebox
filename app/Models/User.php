@@ -95,9 +95,9 @@ class User extends Authenticatable
         return $this->tipoUsuario->tipo_nombre === 'Empleado';
     }
 
-    public function esRRHH()
+    public function esDueno()
     {
-        return $this->tipoUsuario->tipo_nombre === 'RRHH';
+        return $this->tipoUsuario->tipo_nombre === 'Dueño';
     }
 
     public function getNombreCompletoAttribute()

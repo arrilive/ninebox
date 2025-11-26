@@ -24,11 +24,23 @@ class EncuestaController extends Controller
 
         $totalPreg = (int) DB::table('preguntas')->count();
 
-        if (method_exists($user, 'esSuperusuario') && $user->esSuperusuario()) {
+        $esSuper = method_exists($user, 'esSuperusuario') && $user->esSuperusuario();
+        $esDueno = method_exists($user, 'esDueno') && $user->esDueno();
+
+        if ($esSuper) {
+            //Admin: todas las encuestas de empleados
             $empleadosBase = User::query()
                 ->whereHas('tipoUsuario', fn($q) => $q->whereRaw('LOWER(tipo_nombre) = ?', ['empleado']))
                 ->get();
+
+        } elseif ($esDueno) {
+            // Dueño: lista de todos los JEFES
+            $empleadosBase = User::query()
+                ->whereHas('tipoUsuario', fn($q) => $q->whereRaw('LOWER(tipo_nombre) = ?', ['jefe']))
+                ->get();
+
         } else {
+            // Jefe: solo sus empleados
             $empleadosBase = $user->empleados()->get();
         }
 
@@ -99,8 +111,11 @@ class EncuestaController extends Controller
         $anio = (int)($request->query('anio', now()->year));
         $mes  = (int)($request->query('mes',  now()->month));
 
-        // Solo jefes se limitan a sus empleados; superadmin ve todo
-        if (!(method_exists($user, 'esSuperusuario') && $user->esSuperusuario())) {
+        $esSuper = method_exists($user, 'esSuperusuario') && $user->esSuperusuario();
+        $esDueno = method_exists($user, 'esDueno') && $user->esDueno();
+
+        // Solo jefes se limitan a sus empleados; superadmin y dueño ven todo
+        if (!$esSuper && !$esDueno) {
             $esDeMiDepto = $user->empleados()->where('id', $empleado)->exists();
             abort_unless($esDeMiDepto, 403);
         }
@@ -163,8 +178,11 @@ class EncuestaController extends Controller
         $anio = (int)($request->query('anio', now()->year));
         $mes  = (int)($request->query('mes',  now()->month));
 
-        // Solo jefes se limitan a sus empleados; superadmin ve todo
-        if (!(method_exists($user, 'esSuperusuario') && $user->esSuperusuario())) {
+        $esSuper = method_exists($user, 'esSuperusuario') && $user->esSuperusuario();
+        $esDueno = method_exists($user, 'esDueno') && $user->esDueno();
+
+        // Solo jefes se limitan a sus empleados; superadmin y dueño ven todo
+        if (!$esSuper && !$esDueno) {
             $esDeMiDepto = $user->empleados()->where('id', $empleado)->exists();
             abort_unless($esDeMiDepto, 403);
         }

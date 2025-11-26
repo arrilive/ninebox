@@ -14,11 +14,8 @@ class PuedeEvaluar
             abort(403);
         }
 
-        // Ajusta a cómo guardas el rol en tu tabla
-        $rol = strtolower($u->tipoUsuario->tipo_nombre ?? '');
-
-        // Permitir sólo Jefe y Superusuario
-        if (!in_array($rol, ['jefe', 'superusuario'])) {
+        $tipoId = $u->tipo_usuario_id;
+        if (!in_array($tipoId, [2, 4])) { 
             abort(403);
         }
 

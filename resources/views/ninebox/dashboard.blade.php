@@ -11,7 +11,10 @@
           $anioActual = request('anio', now()->year);
           $mesActual = request('mes', now()->month);
           $encuestaEmpleadoBase = url('/encuestas');
-          $esSuper = $esSuper ?? (isset($usuario) && method_exists($usuario, 'esSuperusuario') && $usuario->esSuperusuario());
+          $usuarioPresente = isset($usuario);
+          $esSuper = $usuarioPresente && method_exists($usuario, 'esSuperusuario') && $usuario->esSuperusuario();
+          $esDueno = $usuarioPresente && method_exists($usuario, 'esDueno') && $usuario->esDueno();
+          $esJefe  = $usuarioPresente && method_exists($usuario, 'esJefe') && $usuario->esJefe();
         @endphp
 
         {{-- Sidebar resumen --}}
@@ -21,11 +24,17 @@
             <div class="absolute inset-0 bg-black/10"></div>
             <div class="relative">
               <h3 class="text-white font-extrabold text-3xl tracking-tight">Resumen</h3>
-              @if (method_exists($usuario, 'esSuperusuario') && $usuario->esSuperusuario())
-                  {{-- Superusuario: solo muestra "Resumen" y ya --}}
+
+              @if ($esSuper)
+                  {{-- Superusuario: "Resumen" sin subtítulo --}}
                   <p class="text-white text-xl leading-snug"></p>
+              @elseif ($esDueno)
+                  {{-- Dueño: muestra su user_name --}}
+                  <p class="text-white text-xl leading-snug">
+                      {{ $usuario->user_name }}
+                  </p>
               @else
-                  {{-- Jefe: mostrar su departamento --}}
+                  {{-- Jefe (u otro no empleado): mostrar su departamento --}}
                   <p class="text-white text-xl leading-snug">
                       {{ optional($usuario->departamento)->nombre_departamento ?? 'Sin departamento' }}
                   </p>
@@ -93,18 +102,21 @@
               </div>
             </section>
 
-            {{-- CTA lista empleados (solo jefes) --}}
-            @if (isset($usuario) && method_exists($usuario, 'esJefe') && $usuario->esJefe())
+            {{-- CTA lista empleados --}}
+            @if ($usuarioPresente && ($esJefe || $esDueno))
               <div class="mt-2 space-y-2">
                 <a
                   id="btn-por-evaluar"
                   href="{{ route('encuestas.empleados', ['anio' => $anioActual, 'mes' => $mesActual]) }}"
                   class="btn btn-primary btn-block"
                 >
-                  Evaluar empleados
+                  {{ $esDueno ? 'Evaluar' : 'Evaluar empleados' }}
                 </a>
                 <p class="text-[13px] text-center mt-1 text-gray-700 dark:text-gray-400">
-                  Abre la lista de empleados para iniciar o continuar encuestas.
+                  {{ $esDueno
+                      ? 'Abre la lista para iniciar o continuar encuestas.'
+                      : 'Abre la lista de empleados para iniciar o continuar encuestas.'
+                  }}
                 </p>
               </div>
             @endif
@@ -429,12 +441,11 @@
   (function () {
     'use strict';
 
-    const ES_SUPER       = @json($esSuper);
+    const ES_GLOBAL      = @json($esSuper || $esDueno);
     const ASIG           = @json($asignacionesActuales ?? []);
     const ENCUESTA_BASE  = @json($encuestaEmpleadoBase);
     const ANIO_ACTUAL    = @json($anioActual);
     const MES_ACTUAL     = @json($mesActual);
-    // Año/mes reales (para no permitir meses futuros)
     const ANIO_HOY       = {{ now()->year }};
     const MES_HOY        = {{ now()->month }};
 
@@ -723,7 +734,8 @@
       const count = document.getElementById('count-asignados');
       if (count) count.textContent = String(lista.length);
       
-      if (ES_SUPER) {
+      // Admin y Dueño: agrupado por departamento
+      if (ES_GLOBAL) {
         renderAgrupadoPorDepto(lista);
       } else {
         renderListaSimple(lista);

@@ -16,6 +16,7 @@ class TipoUsuario extends Model
         'admin' => 1,
         'jefe' => 2,
         'empleado' => 3,
+        'dueno'    => 4,
     ];
 
     public function usuarios()
