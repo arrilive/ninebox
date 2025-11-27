@@ -26,15 +26,15 @@
               <h3 class="text-white font-extrabold text-3xl tracking-tight">Resumen</h3>
 
               @if ($esSuper)
-                  {{-- Superusuario: "Resumen" sin subtítulo --}}
+                  {{-- Admin --}}
                   <p class="text-white text-xl leading-snug"></p>
               @elseif ($esDueno)
-                  {{-- Dueño: muestra su user_name --}}
+                  {{-- Dueño --}}
                   <p class="text-white text-xl leading-snug">
                       {{ $usuario->user_name }}
                   </p>
               @else
-                  {{-- Jefe (u otro no empleado): mostrar su departamento --}}
+                  {{-- Jefe --}}
                   <p class="text-white text-xl leading-snug">
                       {{ optional($usuario->departamento)->nombre_departamento ?? 'Sin departamento' }}
                   </p>
@@ -205,11 +205,10 @@
           {{-- Cuerpo del modal --}}
           <div class="p-6 overflow-y-auto" style="max-height: calc(80vh - 140px);">
             <div id="section-asignados" class="mb-2">
-              {{-- Header del modal (vacío inicialmente, se llena con JS) --}}
               <div id="modal-header-section" class="flex items-center gap-3 mb-4 select-none">
                 <div class="badge-icon bg-gradient-to-r from-green-600 to-emerald-600" id="badge-asignados">
                   <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 0 0118 0z"/>
                   </svg>
                 </div>
                 <h4 id="title-asignados" class="text-xl font-bold text-gray-900 dark:text-white">Asignados</h4>
@@ -475,62 +474,56 @@
       window.location.href = url.toString();
     }
 
-        const filtroMesEl = document.getElementById('filtro-mes');
+    const filtroMesEl = document.getElementById('filtro-mes');
 
-        // Guardamos las opciones originales (1..12) para reconstruirlas sin perder nombres
-        const OPCIONES_MESES_ORIGINALES = filtroMesEl
-          ? Array.from(filtroMesEl.options).map(o => ({
-              value: o.value,
-              text:  o.text,
-            }))
-          : [];
+    // Guardamos las opciones originales (1..12) para reconstruirlas sin perder nombres
+    const OPCIONES_MESES_ORIGINALES = filtroMesEl
+      ? Array.from(filtroMesEl.options).map(o => ({
+          value: o.value,
+          text:  o.text,
+        }))
+      : [];
 
-        function limitarMesesPorAnio() {
-          const anioEl = document.getElementById('filtro-anio');
-          const mesEl  = document.getElementById('filtro-mes');
-          if (!anioEl || !mesEl || OPCIONES_MESES_ORIGINALES.length === 0) return;
+    function limitarMesesPorAnio() {
+      const anioEl = document.getElementById('filtro-anio');
+      const mesEl  = document.getElementById('filtro-mes');
+      if (!anioEl || !mesEl || OPCIONES_MESES_ORIGINALES.length === 0) return;
 
-          const anioSel     = parseInt(anioEl.value || ANIO_ACTUAL, 10);
-          const limiteMes   = (anioSel === ANIO_HOY) ? MES_HOY : 12; // no ir más allá del mes actual
-          const mesPrevio   = parseInt(mesEl.value || MES_ACTUAL, 10);
+      const anioSel     = parseInt(anioEl.value || ANIO_ACTUAL, 10);
+      const limiteMes   = (anioSel === ANIO_HOY) ? MES_HOY : 12; // no ir más allá del mes actual
+      const mesPrevio   = parseInt(mesEl.value || MES_ACTUAL, 10);
 
-          // Limpiamos el select y lo volvemos a llenar
-          mesEl.innerHTML = '';
+      mesEl.innerHTML = '';
 
-          OPCIONES_MESES_ORIGINALES.forEach(optData => {
-            const v = parseInt(optData.value, 10);
-            if (Number.isNaN(v)) return;
+      OPCIONES_MESES_ORIGINALES.forEach(optData => {
+        const v = parseInt(optData.value, 10);
+        if (Number.isNaN(v)) return;
+        if (v > limiteMes) return;
 
-            if (v > limiteMes) return; // bloqueamos meses futuros
+        const opt = document.createElement('option');
+        opt.value = optData.value;
+        opt.textContent = optData.text;
 
-            const opt = document.createElement('option');
-            opt.value = optData.value;
-            opt.textContent = optData.text;
-
-            if (v === mesPrevio && v <= limiteMes) {
-              opt.selected = true;
-            }
-
-            mesEl.appendChild(opt);
-          });
-
-          // Si el mes previo era futuro y ya no existe, forzamos al último permitido
-          if (!mesEl.value) {
-            mesEl.value = String(limiteMes);
-          }
+        if (v === mesPrevio && v <= limiteMes) {
+          opt.selected = true;
         }
 
-        // Al cargar el script, ajustamos los meses una vez
-        limitarMesesPorAnio();
+        mesEl.appendChild(opt);
+      });
 
-        // Cuando cambia el año: primero limitar meses y luego recargar
-        document.getElementById('filtro-anio')?.addEventListener('change', function () {
-          limitarMesesPorAnio();
-          reloadWithPeriodo();
-        });
+      if (!mesEl.value) {
+        mesEl.value = String(limiteMes);
+      }
+    }
 
-        // Cuando cambia solo el mes, solo recargamos
-        document.getElementById('filtro-mes')?.addEventListener('change',  reloadWithPeriodo);
+    limitarMesesPorAnio();
+
+    document.getElementById('filtro-anio')?.addEventListener('change', function () {
+      limitarMesesPorAnio();
+      reloadWithPeriodo();
+    });
+
+    document.getElementById('filtro-mes')?.addEventListener('change',  reloadWithPeriodo);
 
     function urlEncuestaEmpleado(empId){
       const { anio, mes } = getPeriodo();
@@ -559,7 +552,7 @@
       if (title) title.textContent = 'Asignados';
       if (badge) {
         badge.className = 'badge-icon bg-gradient-to-r from-green-600 to-emerald-600';
-        badge.innerHTML = '<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+        badge.innerHTML = '<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 0 0118 0z"/></svg>';
       }
 
       ul.innerHTML = '';
@@ -625,13 +618,13 @@
 
       // PALETA por departamento
       const palette = [
-        '#22c55e', // verde
-        '#0ea5e9', // azul cielo
-        '#a855f7', // violeta
-        '#f97316', // naranja
-        '#e11d48', // rosa
-        '#14b8a6', // teal
-        '#84cc16', // lima
+        '#22c55e',
+        '#0ea5e9',
+        '#a855f7',
+        '#f97316',
+        '#e11d48',
+        '#14b8a6',
+        '#84cc16',
       ];
       const colorByDepto = {};
       deptos.forEach((dep, idx) => {
@@ -651,11 +644,15 @@
         porDepto[deptos[0]]
           .sort((a,b)=> (a.nombre||'').localeCompare(b.nombre||'','es'))
           .forEach((emp, i)=>{
+            const empId = Number(emp.usuario_id ?? emp.id);
+
             const li = document.createElement('li');
             li.className = 'lista-empleado';
-            li.style.cursor = 'default';
+            li.style.cursor = 'pointer';
             li.style.animation = `slideIn 0.32s ease-out ${i*0.04}s both`;
             li.style.setProperty('--depto-color', colorByDepto[deptos[0]] || 'rgba(5,150,105,0.95)');
+            li.tabIndex = 0;
+            li.setAttribute('role', 'button');
 
             const left = document.createElement('div');
             left.className = 'flex items-center gap-3';
@@ -664,14 +661,29 @@
             avatar.className = 'avatar-icon';
             avatar.innerHTML = '<svg class="w-5 h-5 text-gray-700 dark:text-gray-200" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a5 5 0 100-10 5 5 0 000 10zM2 18a8 8 0 0116 0H2z"/></svg>';
 
-            const name = document.createElement('span');
-            name.className = 'font-semibold text-gray-900 dark:text-white nombre-empleado';
-            name.textContent = [emp.nombre||'', emp.apellido_paterno||'', emp.apellido_materno||''].join(' ').trim();
+            const fullName = [emp.nombre||'', emp.apellido_paterno||'', emp.apellido_materno||'']
+              .join(' ')
+              .trim() || `ID #${empId}`;
+
+            const name = document.createElement('a');
+            name.className = 'font-semibold text-gray-900 dark:text-white nombre-empleado underline-offset-2';
+            name.textContent = fullName;
+            name.href = urlEncuestaEmpleado(empId);
 
             left.appendChild(avatar);
             left.appendChild(name);
             li.appendChild(left);
             ul.appendChild(li);
+
+            li.addEventListener('click', ()=>{
+              window.location.href = urlEncuestaEmpleado(empId);
+            });
+            li.addEventListener('keydown', (ev)=>{
+              if (ev.key === 'Enter' || ev.key === ' ') {
+                ev.preventDefault();
+                window.location.href = urlEncuestaEmpleado(empId);
+              }
+            });
           });
         return;
       }
@@ -703,12 +715,15 @@
         ul.appendChild(headerLi);
 
         empleados.forEach((emp, i)=>{
+          const empId = Number(emp.usuario_id ?? emp.id);
+
           const li = document.createElement('li');
           li.className = 'lista-empleado';
-          li.style.cursor = 'default';
-          li.setAttribute('aria-disabled','true');
+          li.style.cursor = 'pointer';
           li.style.animation = `slideIn 0.32s ease-out ${i*0.04}s both`;
           li.style.setProperty('--depto-color', colorByDepto[depNombre] || 'rgba(5,150,105,0.95)');
+          li.tabIndex = 0;
+          li.setAttribute('role', 'button');
 
           const left = document.createElement('div');
           left.className = 'flex items-center gap-3';
@@ -717,14 +732,29 @@
           avatar.className = 'avatar-icon';
           avatar.innerHTML = '<svg class="w-5 h-5 text-gray-700 dark:text-gray-200" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a5 5 0 100-10 5 5 0 000 10zM2 18a8 8 0 0116 0H2z"/></svg>';
 
-          const name = document.createElement('span');
-          name.className = 'font-semibold text-gray-900 dark:text-white nombre-empleado';
-          name.textContent = [emp.nombre||'', emp.apellido_paterno||'', emp.apellido_materno||''].join(' ').trim();
+          const fullName = [emp.nombre||'', emp.apellido_paterno||'', emp.apellido_materno||'']
+            .join(' ')
+            .trim() || `ID #${empId}`;
+
+          const name = document.createElement('a');
+          name.className = 'font-semibold text-gray-900 dark:text-white nombre-empleado underline-offset-2';
+          name.textContent = fullName;
+          name.href = urlEncuestaEmpleado(empId);
 
           left.appendChild(avatar);
           left.appendChild(name);
           li.appendChild(left);
           ul.appendChild(li);
+
+          li.addEventListener('click', ()=>{
+            window.location.href = urlEncuestaEmpleado(empId);
+          });
+          li.addEventListener('keydown', (ev)=>{
+            if (ev.key === 'Enter' || ev.key === ' ') {
+              ev.preventDefault();
+              window.location.href = urlEncuestaEmpleado(empId);
+            }
+          });
         });
       });
     }
@@ -734,7 +764,7 @@
       const count = document.getElementById('count-asignados');
       if (count) count.textContent = String(lista.length);
       
-      // Admin y Dueño: agrupado por departamento
+      // Admin y Dueño: agrupado por departamento, pero ahora CLICABLE
       if (ES_GLOBAL) {
         renderAgrupadoPorDepto(lista);
       } else {

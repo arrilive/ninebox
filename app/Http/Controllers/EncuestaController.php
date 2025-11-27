@@ -12,6 +12,7 @@ use App\Models\Encuesta;
 use App\Models\Pregunta;
 use App\Models\Evaluacion;
 use App\Models\Rendimiento;
+use App\Models\TipoUsuario;
 
 class EncuestaController extends Controller
 {
@@ -27,16 +28,10 @@ class EncuestaController extends Controller
         $esSuper = method_exists($user, 'esSuperusuario') && $user->esSuperusuario();
         $esDueno = method_exists($user, 'esDueno') && $user->esDueno();
 
-        if ($esSuper) {
-            //Admin: todas las encuestas de empleados
+        if ($esSuper || $esDueno) {
+            // Admin: SOLO jefes
             $empleadosBase = User::query()
-                ->whereHas('tipoUsuario', fn($q) => $q->whereRaw('LOWER(tipo_nombre) = ?', ['empleado']))
-                ->get();
-
-        } elseif ($esDueno) {
-            // Dueño: lista de todos los JEFES
-            $empleadosBase = User::query()
-                ->whereHas('tipoUsuario', fn($q) => $q->whereRaw('LOWER(tipo_nombre) = ?', ['jefe']))
+                ->where('tipo_usuario_id', TipoUsuario::TIPOS_USUARIO['jefe'])
                 ->get();
 
         } else {
@@ -236,10 +231,10 @@ class EncuestaController extends Controller
             $encuesta->save();
         }
 
-        // Guardar/actualizar respuestas 
+        // Guardar/actualizar respuestas de forma segura (sin PK compuesta en Eloquent)
         DB::transaction(function () use ($encuesta, $data) {
             foreach ($data['respuestas'] as $r) {
-                $preguntaId = (int)$r['pregunta_id'];
+                $preguntaId = (int) $r['pregunta_id'];
                 $puntaje    = $r['puntaje'] ?? null;
 
                 if ($puntaje === null) {
@@ -250,11 +245,16 @@ class EncuestaController extends Controller
                     continue;
                 }
 
-                Evaluacion::updateOrCreate(
-                    ['encuesta_id' => $encuesta->id, 'pregunta_id' => $preguntaId],
+                DB::table('evaluaciones')->updateOrInsert(
                     [
-                        'puntaje'    => (int)$puntaje,
+                        'encuesta_id' => $encuesta->id,
+                        'pregunta_id' => $preguntaId,
+                    ],
+                    [
+                        'puntaje'    => (int) $puntaje,
                         'comentario' => $r['comentario'] ?? null,
+                        'created_at' => now(),  
+                        'updated_at' => now(),   
                     ]
                 );
             }

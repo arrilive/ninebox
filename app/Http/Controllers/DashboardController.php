@@ -56,8 +56,10 @@ class DashboardController extends Controller
         $esJefe  = method_exists($usuario, 'esJefe') && $usuario->esJefe();
 
         if ($esSuper || $esDueno) {
-            // Superadmin y Dueño: ven TODOS los empleados
-            $empleados = User::where('tipo_usuario_id', TipoUsuario::TIPOS_USUARIO['empleado'])
+            $empleados = User::whereIn('tipo_usuario_id', [
+                    TipoUsuario::TIPOS_USUARIO['jefe'],
+                    TipoUsuario::TIPOS_USUARIO['empleado'],
+                ])
                 ->with('departamento')
                 ->get(['id', 'departamento_id', 'nombre', 'apellido_paterno', 'apellido_materno'])
                 ->map(function ($emp) {
@@ -72,7 +74,7 @@ class DashboardController extends Controller
                 });
 
         } elseif ($esJefe) {
-            // Jefe: ve a sus empleados del departamento
+            // Jefe: sus empleados del departamento
             $empleados = $this->empleadosDelDepartamento($usuario);
         }
 
@@ -103,8 +105,6 @@ class DashboardController extends Controller
 
         $empleadosEvaluados = $rendimientos->pluck('usuario_id')->unique()->count();
 
-        $esSuper = $esSuper;
-
         return view('ninebox.dashboard', [
             'usuario'              => $usuario,
             'anioActual'           => $anioActual,
@@ -131,8 +131,10 @@ class DashboardController extends Controller
         $esDueno = method_exists($jefe, 'esDueno') && $jefe->esDueno();
 
         if ($esSuper || $esDueno) {
-            // Superadmin y Dueño: ven todos los empleados
-            $empleados = User::where('tipo_usuario_id', TipoUsuario::TIPOS_USUARIO['empleado'])->get(['id']);
+            $empleados = User::whereIn('tipo_usuario_id', [
+                    TipoUsuario::TIPOS_USUARIO['jefe'],
+                    TipoUsuario::TIPOS_USUARIO['empleado'],
+                ])->get(['id']);
         } else {
             // Jefe: solo su depto
             $empleados = $jefe->departamento_id
