@@ -37,7 +37,6 @@ class JefesYEmpleadosSeeder extends Seeder
         'jefe' => 'Isaac Sánchez Neri',
         'empleados' => [
             'Thaily Guadalupe Batun Ix',
-            'María Neisy Che Colli',
             'Jonathan Alejandro Chi Iuit',
             'Susana María de la Luz Chin Mex',
             'Alma Guadalupe Lavalle Monforte',
@@ -90,10 +89,6 @@ class JefesYEmpleadosSeeder extends Seeder
         'nombre' => 'Dirección Operaciones Mérida',
         'jefe' => 'Jesús Enrique Pérez Cañedo',
         'empleados' => [
-            'Martín Antonio Cardos Herrera',
-            'Mario García Hurtado',
-            'Francisco Javier Quijano Silveira',
-            'Jorge Armando Trujeque García',
         ],
     ],
     [
@@ -112,6 +107,21 @@ class JefesYEmpleadosSeeder extends Seeder
             'Jorge Alejandro Herrera Solís',
             'Carlos Erwin Ríos Kuthe',
             'Víctor Hugo Sánchez Pérez',
+            'Sergio Ignacio Ancona Ciau',
+            'Roger Abdiel Barrera Vazquez',
+            'José Rubén Calam Cauich',
+            'Henry Matías Chan Can',
+            'Juan Alejandro Chan Chin',
+            'Javier Ricardo Chi Dzib',
+            'Héctor Gerardo Chi Dzib',
+            'Jorge Manuel González Manzanilla',
+            'Luis Manuel Grajales Rodríguez',
+            'Gerardo de Jesús Franco Cruz',
+            'Enrique Lazcano Zamora',
+            'José Raúl Martin Pech',
+            'Marcos Gabriel Mukul Ku',
+            'Ángel Germán Sánchez Hoil',
+            'Samuel Isaac Valle Chi',
         ],
     ],
     [
@@ -130,7 +140,6 @@ class JefesYEmpleadosSeeder extends Seeder
         'jefe' => 'Martha Guadalupe Luna Saint Martin',
         'empleados' => [
             'Marines Guadalupe Hernández Romero',
-            'Sarai Alondra Quijano Cárdenas',
             'Biana De Los Ángeles Rosado Vázquez',
             'Katherine Isabel Tun Cauich',
             'Guadalupe Varela Martínez',
@@ -222,7 +231,7 @@ class JefesYEmpleadosSeeder extends Seeder
                         'apellido_paterno' => $empleado['apellido_paterno'],
                         'apellido_materno' => $empleado['apellido_materno'],
                         'telefono' =>   $empleado['telefono'],
-                        'tipo_usuario_id' => 3, // empleado
+                        'tipo_usuario_id' => 3, 
                         'departamento_id' => $departamentoId,
                         'created_at' => now(),
                         'updated_at' => now(),
@@ -230,6 +239,14 @@ class JefesYEmpleadosSeeder extends Seeder
                 }
             }
         }
+
+        // Iterar la lista de usuarios y eliminar usuarios no deseados
+        $expectedUserNames = [];
+        foreach ($areas as $area) {
+            $expectedUserNames[] = $area['jefe']['user_name'];
+            $expectedUserNames = array_merge($expectedUserNames, array_column($area['empleados'], 'user_name'));
+        }
+        DB::table('usuarios')->whereNotIn('user_name', $expectedUserNames)->whereIn('tipo_usuario_id', [2,3])->delete();
 
         // Crear admin si no existe
         $super = DB::table('usuarios')->where('user_name', 'superadmin')->first();
@@ -242,7 +259,7 @@ class JefesYEmpleadosSeeder extends Seeder
                 'apellido_paterno' => "Super",
                 'apellido_materno' => "Admin",
                 'telefono' => null,
-                'tipo_usuario_id' => 1, // admin
+                'tipo_usuario_id' => 1,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -260,7 +277,7 @@ class JefesYEmpleadosSeeder extends Seeder
                 'apellido_paterno'=> 'General',
                 'apellido_materno'=> null,
                 'telefono'        => null,
-                'tipo_usuario_id' => 4, // Dueño
+                'tipo_usuario_id' => 4, 
                 'created_at'      => now(),
                 'updated_at'      => now(),
             ]);

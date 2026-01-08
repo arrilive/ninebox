@@ -9,12 +9,16 @@
           $pendientes = max(0, $totalEmpleados - $empleadosEvaluados);
           $pct = $totalEmpleados > 0 ? min(100, round(($empleadosEvaluados / $totalEmpleados) * 100)) : 0;
           $anioActual = request('anio', now()->year);
-          $mesActual = request('mes', now()->month);
+          $mesInicio = request('mes_inicio', request('mes', now()->month));
+          $mesFin = request('mes_fin', request('mes', now()->month));
+          $mesActual = $mesInicio; // Para compatibilidad
           $encuestaEmpleadoBase = url('/encuestas');
           $usuarioPresente = isset($usuario);
           $esSuper = $usuarioPresente && method_exists($usuario, 'esSuperusuario') && $usuario->esSuperusuario();
           $esDueno = $usuarioPresente && method_exists($usuario, 'esDueno') && $usuario->esDueno();
           $esJefe  = $usuarioPresente && method_exists($usuario, 'esJefe') && $usuario->esJefe();
+          $departamentoFiltro = request('departamento', 'todos');
+          $rolFiltro = request('rol', 'todos');
         @endphp
 
         {{-- Sidebar resumen --}}
@@ -42,32 +46,163 @@
             </div>
           </div>
           <div class="p-7 space-y-7">
-            {{-- Periodo --}}
-            <section aria-label="Periodo" class="flex flex-wrap items-center gap-3">
-              <div>
-                @php
-                    $primerAnio = 2025; 
-                @endphp
+          @php
+            $primerAnio = 2025;
+            $meses = [1=>'Enero',2=>'Febrero',3=>'Marzo',4=>'Abril',5=>'Mayo',6=>'Junio',7=>'Julio',8=>'Agosto',9=>'Septiembre',10=>'Octubre',11=>'Noviembre',12=>'Diciembre'];
+            $mesInicioNombre = $meses[$mesInicio] ?? 'Enero';
+            $mesFinNombre = $meses[$mesFin] ?? 'Enero';
+            
+            // Texto del rango de meses considerando años
+            $anioInicio = $anioInicio ?? $anioActual;
+            $anioFin = $anioFin ?? $anioActual;
+            
+            if ($anioInicio === $anioFin) {
+              // Mismo año
+              $rangoTexto = ($mesInicio === $mesFin) 
+                ? $mesInicioNombre . ' ' . $anioInicio
+                : $mesInicioNombre . ' - ' . $mesFinNombre . ' ' . $anioInicio;
+            } else {
+              // Rango que cruza años
+              $rangoTexto = $mesInicioNombre . ' ' . $anioInicio . ' - ' . $mesFinNombre . ' ' . $anioFin;
+            }
+            
+            // Texto del rango de años
+            $rangoAnioTexto = ($anioInicio === $anioFin) 
+              ? (string)$anioInicio
+              : $anioInicio . ' - ' . $anioFin;
+          @endphp
 
-                <label for="filtro-anio" class="block text-sm font-medium text-gray-700 dark:text-white mb-1">Año</label>
-                <select id="filtro-anio"
-                  class="rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900/70 dark:text-white
-                              focus:border-indigo-500 focus:ring-indigo-500">
-                  @for ($i = now()->year; $i >= $primerAnio; $i--)
-                    <option value="{{ $i }}" {{ (int)$i === (int)$anioActual ? 'selected' : '' }}>{{ $i }}</option>
-                  @endfor
-                </select>
-              </div>
+            {{-- Filtros --}}
+            <section aria-label="Filtros" class="space-y-4 border-b border-gray-200 dark:border-gray-700 pb-6">
+              {{-- Rango de meses --}}
               <div>
-                <label for="filtro-mes" class="block text-sm font-medium text-gray-700 dark:text-white mb-1">Mes</label>
-                <select id="filtro-mes"
-                  class="rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900/70 dark:text-white
-                               focus:border-indigo-500 focus:ring-indigo-500">
-                  @foreach ([1=>'Enero',2=>'Febrero',3=>'Marzo',4=>'Abril',5=>'Mayo',6=>'Junio',7=>'Julio',8=>'Agosto',9=>'Septiembre',10=>'Octubre',11=>'Noviembre',12=>'Diciembre'] as $num => $mes)
-                    <option value="{{ $num }}" {{ (int)$num === (int)$mesActual ? 'selected' : '' }}>{{ $mes }}</option>
-                  @endforeach
-                </select>
+                <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1.5">Rango de meses</label>
+                <div class="relative">
+                  <button type="button" id="btn-rango-meses" 
+                    class="w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-900/70
+                               focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 text-left flex items-center justify-between
+                               bg-white dark:bg-gray-900/70 hover:bg-gray-50 dark:hover:bg-gray-800/70 transition-colors
+                               text-gray-900 dark:text-white">
+                    <span id="rango-meses-texto" class="text-gray-900 dark:text-white">{{ $rangoTexto }}</span>
+                    <svg class="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                  </button>
+                  
+                  {{-- Panel desplegable del rango --}}
+                  <div id="panel-rango-meses" class="hidden absolute z-50 mt-2 left-0 right-0 min-w-[280px] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-4">
+                    <div class="space-y-4">
+                      <div>
+                        <label for="filtro-mes-inicio" class="block text-xs font-medium text-gray-700 dark:text-white mb-1.5">Mes Inicio</label>
+                        <select id="filtro-mes-inicio"
+                          class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900/70 dark:text-white
+                                       focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 text-sm">
+                          @foreach ($meses as $num => $mes)
+                            <option value="{{ $num }}" {{ (int)$num === (int)$mesInicio ? 'selected' : '' }}>{{ $mes }}</option>
+                          @endforeach
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label for="filtro-mes-fin" class="block text-xs font-medium text-gray-700 dark:text-white mb-1.5">Mes Fin</label>
+                        <select id="filtro-mes-fin"
+                          class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900/70 dark:text-white
+                                       focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 text-sm">
+                          @foreach ($meses as $num => $mes)
+                            <option value="{{ $num }}" {{ (int)$num === (int)$mesFin ? 'selected' : '' }}>{{ $mes }}</option>
+                          @endforeach
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
+
+              {{-- Filtros adicionales para Admin/Dueño --}}
+              @if ($esSuper || $esDueno)
+                {{-- Departamento --}}
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1.5">Departamento</label>
+                  <div class="relative">
+                    <button type="button" id="btn-departamento" 
+                      class="w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-900/70
+                                 focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 text-left flex items-center justify-between
+                                 bg-white dark:bg-gray-900/70 hover:bg-gray-50 dark:hover:bg-gray-800/70 transition-colors
+                                 text-gray-900 dark:text-white">
+                      <span id="departamento-texto" class="text-gray-900 dark:text-white">
+                        @if($departamentoFiltro === 'todos')
+                          Todos los departamentos
+                        @else
+                          @foreach ($departamentos ?? [] as $depto)
+                            @if((string)$depto->id === (string)$departamentoFiltro)
+                              {{ $depto->nombre_departamento }}
+                              @break
+                            @endif
+                          @endforeach
+                        @endif
+                      </span>
+                      <svg class="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                      </svg>
+                    </button>
+                    
+                    {{-- Panel desplegable del departamento --}}
+                    <div id="panel-departamento" class="hidden absolute z-50 mt-2 left-0 right-0 min-w-[280px] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-2 max-h-60 overflow-y-auto">
+                      <button type="button" class="filtro-option w-full text-left px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white {{ $departamentoFiltro === 'todos' ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400' : '' }}"
+                        data-value="todos">
+                        Todos los departamentos
+                      </button>
+                      @foreach ($departamentos ?? [] as $depto)
+                        <button type="button" class="filtro-option w-full text-left px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white {{ (string)$depto->id === (string)$departamentoFiltro ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400' : '' }}"
+                          data-value="{{ $depto->id }}" data-text="{{ $depto->nombre_departamento }}">
+                          {{ $depto->nombre_departamento }}
+                        </button>
+                      @endforeach
+                    </div>
+                  </div>
+                </div>
+                
+                {{-- Rol --}}
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1.5">Rol</label>
+                  <div class="relative">
+                    <button type="button" id="btn-rol" 
+                      class="w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-900/70
+                                 focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 text-left flex items-center justify-between
+                                 bg-white dark:bg-gray-900/70 hover:bg-gray-50 dark:hover:bg-gray-800/70 transition-colors
+                                 text-gray-900 dark:text-white">
+                      <span id="rol-texto" class="text-gray-900 dark:text-white">
+                        @if($rolFiltro === 'todos')
+                          Todos los roles
+                        @elseif($rolFiltro === 'jefe')
+                          Jefes
+                        @elseif($rolFiltro === 'empleado')
+                          Empleados
+                        @endif
+                      </span>
+                      <svg class="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                      </svg>
+                    </button>
+                    
+                    {{-- Panel desplegable del rol --}}
+                    <div id="panel-rol" class="hidden absolute z-50 mt-2 left-0 right-0 min-w-[200px] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-2">
+                      <button type="button" class="filtro-option w-full text-left px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white {{ $rolFiltro === 'todos' ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400' : '' }}"
+                        data-value="todos" data-text="Todos los roles">
+                        Todos los roles
+                      </button>
+                      <button type="button" class="filtro-option w-full text-left px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white {{ $rolFiltro === 'jefe' ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400' : '' }}"
+                        data-value="jefe" data-text="Jefes">
+                        Jefes
+                      </button>
+                      <button type="button" class="filtro-option w-full text-left px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white {{ $rolFiltro === 'empleado' ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400' : '' }}"
+                        data-value="empleado" data-text="Empleados">
+                        Empleados
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              @endif
             </section>
 
             {{-- KPIs --}}
@@ -125,6 +260,89 @@
 
         {{-- Nine-Box + hotspots --}}
         <div class="flex-1">
+          {{-- Filtro de rango de años (separado, solo admin/dueño) --}}
+          @if ($esSuper || $esDueno)
+            <div class="flex justify-end mb-4">
+              <div class="relative">
+                @php
+                  $primerAnio = 2025;
+                @endphp
+                <button type="button" id="btn-rango-anios" 
+                  class="rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-900/70
+                             focus:border-indigo-500 focus:ring-indigo-500 py-2 px-4 text-left flex items-center justify-between gap-2
+                             bg-white dark:bg-gray-900/70 hover:bg-gray-50 dark:hover:bg-gray-800/70 transition-colors text-sm font-medium
+                             text-gray-900 dark:text-white">
+                  <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                  </svg>
+                  <span id="rango-anios-texto" class="text-gray-900 dark:text-white">{{ $rangoAnioTexto }}</span>
+                  <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                </button>
+                
+                {{-- Panel desplegable del rango de años --}}
+                <div id="panel-rango-anios" class="hidden absolute z-50 mt-2 right-0 min-w-[280px] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-4">
+                  <div class="space-y-4">
+                    <div>
+                      <label for="filtro-anio-inicio" class="block text-xs font-medium text-gray-700 dark:text-white mb-1.5">Año Inicio</label>
+                      <select id="filtro-anio-inicio"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900/70 dark:text-white
+                                   focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 text-sm">
+                        @for ($i = now()->year; $i >= $primerAnio; $i--)
+                          <option value="{{ $i }}" {{ (int)$i === (int)$anioInicio ? 'selected' : '' }}>{{ $i }}</option>
+                        @endfor
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label for="filtro-anio-fin" class="block text-xs font-medium text-gray-700 dark:text-white mb-1.5">Año Fin</label>
+                      <select id="filtro-anio-fin"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900/70 dark:text-white
+                                   focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 text-sm">
+                        @for ($i = now()->year; $i >= $primerAnio; $i--)
+                          <option value="{{ $i }}" {{ (int)$i === (int)$anioFin ? 'selected' : '' }}>{{ $i }}</option>
+                        @endfor
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          @else
+            {{-- Para jefes, mantener el botón simple de año --}}
+            <div class="flex justify-end mb-4">
+              <div class="relative">
+                @php
+                  $primerAnio = 2025;
+                @endphp
+                <button type="button" id="btn-anio" 
+                  class="rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-900/70
+                             focus:border-indigo-500 focus:ring-indigo-500 py-2 px-4 text-left flex items-center justify-between gap-2
+                             bg-white dark:bg-gray-900/70 hover:bg-gray-50 dark:hover:bg-gray-800/70 transition-colors text-sm font-medium
+                             text-gray-900 dark:text-white">
+                  <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                  </svg>
+                  <span id="anio-texto" class="text-gray-900 dark:text-white">{{ $anioActual }}</span>
+                  <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                </button>
+                
+                {{-- Panel desplegable del año --}}
+                <div id="panel-anio" class="hidden absolute z-50 mt-2 right-0 min-w-[120px] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-2 max-h-60 overflow-y-auto">
+                  @for ($i = now()->year; $i >= $primerAnio; $i--)
+                    <button type="button" class="filtro-option w-full text-left px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white {{ (int)$i === (int)$anioActual ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400' : '' }}"
+                      data-value="{{ $i }}" data-text="{{ $i }}">
+                      {{ $i }}
+                    </button>
+                  @endfor
+                </div>
+              </div>
+            </div>
+          @endif
+
           <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-5 border border-gray-200 dark:border-gray-700">
             <div class="relative w-full mx-auto" style="max-width: 96%;">
               <img
@@ -433,6 +651,22 @@
       from{opacity:0;transform:translateY(8px);}
       to{opacity:1;transform:translateY(0);}
     }
+
+    /* Paneles desplegables */
+    #panel-rango-meses, #panel-anio, #panel-rango-anios, #panel-departamento, #panel-rol{
+      animation: slideDown 0.2s ease-out;
+    }
+    @keyframes slideDown{
+      from{opacity:0;transform:translateY(-8px);}
+      to{opacity:1;transform:translateY(0);}
+    }
+    #panel-rango-meses select option:disabled{
+      color: #9ca3af;
+      font-style: italic;
+    }
+    .filtro-option{
+      font-size: 0.875rem;
+    }
   </style>
 
   {{-- JS --}}
@@ -444,6 +678,10 @@
     const ASIG           = @json($asignacionesActuales ?? []);
     const ENCUESTA_BASE  = @json($encuestaEmpleadoBase);
     const ANIO_ACTUAL    = @json($anioActual);
+    const ANIO_INICIO    = @json($anioInicio ?? $anioActual);
+    const ANIO_FIN       = @json($anioFin ?? $anioActual);
+    const MES_INICIO     = @json($mesInicio ?? $mesActual);
+    const MES_FIN        = @json($mesFin ?? $mesActual);
     const MES_ACTUAL     = @json($mesActual);
     const ANIO_HOY       = {{ now()->year }};
     const MES_HOY        = {{ now()->month }};
@@ -460,76 +698,425 @@
       4:{title:"Personal clave",desc:"Confiables con buen desempeño, pero con poco potencial de desarrollo"}
     };
 
+    // Variables globales para almacenar valores de filtros
+    let filtroAnio = ANIO_ACTUAL;
+    let filtroAnioInicio = ANIO_INICIO;
+    let filtroAnioFin = ANIO_FIN;
+    let filtroDepartamento = @json($departamentoFiltro ?? 'todos');
+    let filtroRol = @json($rolFiltro ?? 'todos');
+
     function getPeriodo(){
-      const anioSel = document.getElementById('filtro-anio')?.value ?? ANIO_ACTUAL;
-      const mesSel  = document.getElementById('filtro-mes')?.value  ?? MES_ACTUAL;
-      return { anio: String(anioSel).trim(), mes: String(mesSel).trim() };
+      const mesInicioSel = document.getElementById('filtro-mes-inicio')?.value ?? MES_INICIO;
+      const mesFinSel = document.getElementById('filtro-mes-fin')?.value ?? MES_FIN;
+      
+      // Si es admin/dueño, obtener rangos de años
+      let anioInicioSel = filtroAnioInicio;
+      let anioFinSel = filtroAnioFin;
+      
+      if (ES_GLOBAL) {
+        const anioInicioEl = document.getElementById('filtro-anio-inicio');
+        const anioFinEl = document.getElementById('filtro-anio-fin');
+        if (anioInicioEl) anioInicioSel = parseInt(anioInicioEl.value, 10) || filtroAnioInicio;
+        if (anioFinEl) anioFinSel = parseInt(anioFinEl.value, 10) || filtroAnioFin;
+      }
+      
+      return { 
+        anio: String(anioInicioSel).trim(), // Para compatibilidad
+        anio_inicio: String(anioInicioSel).trim(),
+        anio_fin: String(anioFinSel).trim(),
+        mes_inicio: String(mesInicioSel).trim(),
+        mes_fin: String(mesFinSel).trim()
+      };
     }
     
     function reloadWithPeriodo() {
-      const { anio, mes } = getPeriodo();
+      const { anio, anio_inicio, anio_fin, mes_inicio, mes_fin } = getPeriodo();
       const url = new URL(window.location.href);
-      url.searchParams.set('anio', anio);
-      url.searchParams.set('mes',  mes);
+      
+      // Si es admin/dueño, usar rangos de años
+      if (ES_GLOBAL) {
+        url.searchParams.set('anio_inicio', anio_inicio);
+        url.searchParams.set('anio_fin', anio_fin);
+        // Mantener 'anio' para compatibilidad
+        url.searchParams.set('anio', anio_inicio);
+      } else {
+        // Para jefes, usar año único
+        url.searchParams.set('anio', anio);
+        url.searchParams.delete('anio_inicio');
+        url.searchParams.delete('anio_fin');
+      }
+      
+      url.searchParams.set('mes_inicio', mes_inicio);
+      url.searchParams.set('mes_fin', mes_fin);
+      
+      // Si es admin/dueño, agregar filtros adicionales
+      if (ES_GLOBAL) {
+        if (filtroDepartamento && filtroDepartamento !== 'todos') {
+          url.searchParams.set('departamento', filtroDepartamento);
+        } else {
+          url.searchParams.delete('departamento');
+        }
+        if (filtroRol && filtroRol !== 'todos') {
+          url.searchParams.set('rol', filtroRol);
+        } else {
+          url.searchParams.delete('rol');
+        }
+      }
+      
       window.location.href = url.toString();
     }
 
-    const filtroMesEl = document.getElementById('filtro-mes');
+    // Nombres de meses
+    const NOMBRES_MESES = {
+      1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril', 5: 'Mayo', 6: 'Junio',
+      7: 'Julio', 8: 'Agosto', 9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
+    };
 
-    // Guardamos las opciones originales (1..12) para reconstruirlas sin perder nombres
-    const OPCIONES_MESES_ORIGINALES = filtroMesEl
-      ? Array.from(filtroMesEl.options).map(o => ({
-          value: o.value,
-          text:  o.text,
-        }))
-      : [];
+    // Lista de todos los paneles para poder cerrarlos
+    const todosLosPaneles = [
+      { id: 'panel-rango-meses', btnId: 'btn-rango-meses' },
+      { id: 'panel-departamento', btnId: 'btn-departamento' },
+      { id: 'panel-rol', btnId: 'btn-rol' },
+      { id: 'panel-anio', btnId: 'btn-anio' },
+      { id: 'panel-rango-anios', btnId: 'btn-rango-anios' }
+    ];
 
-    function limitarMesesPorAnio() {
-      const anioEl = document.getElementById('filtro-anio');
-      const mesEl  = document.getElementById('filtro-mes');
-      if (!anioEl || !mesEl || OPCIONES_MESES_ORIGINALES.length === 0) return;
-
-      const anioSel     = parseInt(anioEl.value || ANIO_ACTUAL, 10);
-      const limiteMes   = (anioSel === ANIO_HOY) ? MES_HOY : 12; // no ir más allá del mes actual
-      const mesPrevio   = parseInt(mesEl.value || MES_ACTUAL, 10);
-
-      mesEl.innerHTML = '';
-
-      OPCIONES_MESES_ORIGINALES.forEach(optData => {
-        const v = parseInt(optData.value, 10);
-        if (Number.isNaN(v)) return;
-        if (v > limiteMes) return;
-
-        const opt = document.createElement('option');
-        opt.value = optData.value;
-        opt.textContent = optData.text;
-
-        if (v === mesPrevio && v <= limiteMes) {
-          opt.selected = true;
+    // Función para cerrar todos los paneles excepto uno
+    function cerrarOtrosPaneles(panelIdExcluido) {
+      todosLosPaneles.forEach(({ id, btnId }) => {
+        if (id !== panelIdExcluido) {
+          const panel = document.getElementById(id);
+          const btn = document.getElementById(btnId);
+          if (panel && !panel.classList.contains('hidden')) {
+            panel.classList.add('hidden');
+            // Remover event listeners si existen
+            if (btn && btn._clickOutsideHandler) {
+              document.removeEventListener('click', btn._clickOutsideHandler);
+              btn._clickOutsideHandler = null;
+            }
+          }
         }
+      });
+    }
 
-        mesEl.appendChild(opt);
+    // Función genérica para manejar paneles desplegables
+    function setupPanelDesplegable(btnId, panelId, onSelect) {
+      const btn = document.getElementById(btnId);
+      const panel = document.getElementById(panelId);
+      if (!btn || !panel) return;
+
+      let clickOutsideHandler = null;
+
+      function abrirPanel(e) {
+        e?.stopPropagation();
+        // Cerrar otros paneles antes de abrir este
+        cerrarOtrosPaneles(panelId);
+        panel.classList.remove('hidden');
+        setTimeout(() => {
+          clickOutsideHandler = (e) => {
+            if (!panel.contains(e.target) && !btn.contains(e.target)) {
+              cerrarPanel();
+            }
+          };
+          btn._clickOutsideHandler = clickOutsideHandler;
+          document.addEventListener('click', clickOutsideHandler);
+        }, 100);
+      }
+
+      function cerrarPanel() {
+        panel.classList.add('hidden');
+        if (clickOutsideHandler) {
+          document.removeEventListener('click', clickOutsideHandler);
+          clickOutsideHandler = null;
+          btn._clickOutsideHandler = null;
+        }
+      }
+
+      btn.addEventListener('click', (e) => {
+        if (panel.classList.contains('hidden')) {
+          abrirPanel(e);
+        } else {
+          cerrarPanel();
+        }
       });
 
-      if (!mesEl.value) {
-        mesEl.value = String(limiteMes);
+      // Cerrar al presionar Escape
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !panel.classList.contains('hidden')) {
+          cerrarPanel();
+        }
+      });
+
+      return { abrirPanel, cerrarPanel };
+    }
+
+    function actualizarTextoRango() {
+      const mesInicioEl = document.getElementById('filtro-mes-inicio');
+      const mesFinEl = document.getElementById('filtro-mes-fin');
+      const textoEl = document.getElementById('rango-meses-texto');
+      
+      if (!mesInicioEl || !mesFinEl || !textoEl) return;
+      
+      const mesInicio = parseInt(mesInicioEl.value, 10);
+      const mesFin = parseInt(mesFinEl.value, 10);
+      
+      const mesInicioNombre = NOMBRES_MESES[mesInicio] || 'Enero';
+      const mesFinNombre = NOMBRES_MESES[mesFin] || 'Enero';
+      
+      // Obtener años actuales
+      let anioInicio = filtroAnioInicio;
+      let anioFin = filtroAnioFin;
+      
+      if (ES_GLOBAL) {
+        const anioInicioEl = document.getElementById('filtro-anio-inicio');
+        const anioFinEl = document.getElementById('filtro-anio-fin');
+        if (anioInicioEl) anioInicio = parseInt(anioInicioEl.value, 10) || filtroAnioInicio;
+        if (anioFinEl) anioFin = parseInt(anioFinEl.value, 10) || filtroAnioFin;
+      }
+      
+      // Construir texto considerando años
+      if (anioInicio === anioFin) {
+        // Mismo año
+        if (mesInicio === mesFin) {
+          textoEl.textContent = `${mesInicioNombre} ${anioInicio}`;
+        } else {
+          textoEl.textContent = `${mesInicioNombre} - ${mesFinNombre} ${anioInicio}`;
+        }
+      } else {
+        // Rango que cruza años
+        textoEl.textContent = `${mesInicioNombre} ${anioInicio} - ${mesFinNombre} ${anioFin}`;
       }
     }
 
-    limitarMesesPorAnio();
+    function actualizarTextoRangoAnios() {
+      if (!ES_GLOBAL) return;
+      
+      const anioInicioEl = document.getElementById('filtro-anio-inicio');
+      const anioFinEl = document.getElementById('filtro-anio-fin');
+      const textoEl = document.getElementById('rango-anios-texto');
+      
+      if (!anioInicioEl || !anioFinEl || !textoEl) return;
+      
+      const anioInicio = parseInt(anioInicioEl.value, 10);
+      const anioFin = parseInt(anioFinEl.value, 10);
+      
+      if (anioInicio === anioFin) {
+        textoEl.textContent = String(anioInicio);
+      } else {
+        textoEl.textContent = `${anioInicio} - ${anioFin}`;
+      }
+      
+      // Actualizar también el texto del rango de meses
+      actualizarTextoRango();
+    }
 
-    document.getElementById('filtro-anio')?.addEventListener('change', function () {
-      limitarMesesPorAnio();
+    function limitarMesesPorAnio() {
+      const mesInicioEl = document.getElementById('filtro-mes-inicio');
+      const mesFinEl = document.getElementById('filtro-mes-fin');
+      if (!mesInicioEl || !mesFinEl) return;
+
+      // Obtener año actual (para admin/dueño puede ser rango, usar inicio)
+      let anioActual = filtroAnio;
+      if (ES_GLOBAL) {
+        const anioInicioEl = document.getElementById('filtro-anio-inicio');
+        if (anioInicioEl) {
+          anioActual = parseInt(anioInicioEl.value, 10) || filtroAnioInicio;
+        }
+      }
+
+      const limiteMes = (anioActual === ANIO_HOY) ? MES_HOY : 12;
+      const mesInicioPrevio = parseInt(mesInicioEl.value || MES_INICIO, 10);
+      const mesFinPrevio = parseInt(mesFinEl.value || MES_FIN, 10);
+
+      // Limitar mes inicio solo si estamos en el año actual
+      if (anioActual === ANIO_HOY) {
+        Array.from(mesInicioEl.options).forEach(opt => {
+          const v = parseInt(opt.value, 10);
+          if (!Number.isNaN(v) && v > limiteMes) {
+            opt.disabled = true;
+          } else {
+            opt.disabled = false;
+          }
+        });
+
+        if (mesInicioPrevio > limiteMes) {
+          mesInicioEl.value = String(limiteMes);
+        }
+
+        // Limitar mes fin
+        Array.from(mesFinEl.options).forEach(opt => {
+          const v = parseInt(opt.value, 10);
+          if (!Number.isNaN(v) && v > limiteMes) {
+            opt.disabled = true;
+          } else {
+            opt.disabled = false;
+          }
+        });
+
+        if (mesFinPrevio > limiteMes) {
+          mesFinEl.value = String(limiteMes);
+        }
+      } else {
+        // Años pasados, habilitar todos los meses
+        Array.from(mesInicioEl.options).forEach(opt => {
+          opt.disabled = false;
+        });
+        Array.from(mesFinEl.options).forEach(opt => {
+          opt.disabled = false;
+        });
+      }
+
+      // Validar que mes_inicio <= mes_fin solo si estamos en el mismo año
+      // Si hay rango de años, no validar
+      if (!ES_GLOBAL || anioActual === parseInt(document.getElementById('filtro-anio-fin')?.value || anioActual, 10)) {
+        const mesInicioVal = parseInt(mesInicioEl.value, 10);
+        const mesFinVal = parseInt(mesFinEl.value, 10);
+        if (mesInicioVal > mesFinVal) {
+          mesFinEl.value = mesInicioEl.value;
+        }
+      }
+      
+      actualizarTextoRango();
+    }
+
+    // Configurar panel de rango de meses
+    setupPanelDesplegable('btn-rango-meses', 'panel-rango-meses');
+    const filtroMesInicioEl = document.getElementById('filtro-mes-inicio');
+    const filtroMesFinEl = document.getElementById('filtro-mes-fin');
+
+    // Aplicar automáticamente cuando cambian los meses
+    filtroMesInicioEl?.addEventListener('change', function() {
+      const mesInicioVal = parseInt(this.value, 10);
+      const mesFinVal = parseInt(filtroMesFinEl?.value, 10);
+      if (filtroMesFinEl && mesInicioVal > mesFinVal) {
+        filtroMesFinEl.value = this.value;
+      }
+      actualizarTextoRango();
       reloadWithPeriodo();
     });
 
-    document.getElementById('filtro-mes')?.addEventListener('change',  reloadWithPeriodo);
+    filtroMesFinEl?.addEventListener('change', function() {
+      const mesFinVal = parseInt(this.value, 10);
+      const mesInicioVal = parseInt(filtroMesInicioEl?.value, 10);
+      if (filtroMesInicioEl && mesInicioVal > mesFinVal) {
+        filtroMesInicioEl.value = this.value;
+      }
+      actualizarTextoRango();
+      reloadWithPeriodo();
+    });
+
+    // Configurar panel de año (solo para jefes, no admin/dueño)
+    if (!ES_GLOBAL) {
+      const panelAnio = setupPanelDesplegable('btn-anio', 'panel-anio');
+      document.querySelectorAll('#panel-anio .filtro-option').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const value = btn.getAttribute('data-value');
+          const text = btn.getAttribute('data-text');
+          filtroAnio = value;
+          document.getElementById('anio-texto').textContent = text;
+          
+          // Actualizar clases activas
+          document.querySelectorAll('#panel-anio .filtro-option').forEach(b => {
+            b.classList.remove('bg-indigo-50', 'dark:bg-indigo-900/20', 'text-indigo-600', 'dark:text-indigo-400');
+          });
+          btn.classList.add('bg-indigo-50', 'dark:bg-indigo-900/20', 'text-indigo-600', 'dark:text-indigo-400');
+          
+          panelAnio.cerrarPanel();
+          limitarMesesPorAnio();
+          reloadWithPeriodo();
+        });
+      });
+    }
+
+    // Configurar panel de rango de años (solo admin/dueño)
+    if (ES_GLOBAL) {
+      setupPanelDesplegable('btn-rango-anios', 'panel-rango-anios');
+      const filtroAnioInicioEl = document.getElementById('filtro-anio-inicio');
+      const filtroAnioFinEl = document.getElementById('filtro-anio-fin');
+
+      // Aplicar automáticamente cuando cambian los años
+      filtroAnioInicioEl?.addEventListener('change', function() {
+        const anioInicioVal = parseInt(this.value, 10);
+        const anioFinVal = parseInt(filtroAnioFinEl?.value, 10);
+        if (filtroAnioFinEl && anioInicioVal > anioFinVal) {
+          filtroAnioFinEl.value = this.value;
+        }
+        filtroAnioInicio = anioInicioVal;
+        actualizarTextoRangoAnios();
+        limitarMesesPorAnio();
+        reloadWithPeriodo();
+      });
+
+      filtroAnioFinEl?.addEventListener('change', function() {
+        const anioFinVal = parseInt(this.value, 10);
+        const anioInicioVal = parseInt(filtroAnioInicioEl?.value, 10);
+        if (filtroAnioInicioEl && anioInicioVal > anioFinVal) {
+          filtroAnioInicioEl.value = this.value;
+        }
+        filtroAnioFin = anioFinVal;
+        actualizarTextoRangoAnios();
+        limitarMesesPorAnio();
+        reloadWithPeriodo();
+      });
+    }
+
+    // Configurar panel de departamento (solo admin/dueño)
+    if (ES_GLOBAL) {
+      const panelDepto = setupPanelDesplegable('btn-departamento', 'panel-departamento');
+      document.querySelectorAll('#panel-departamento .filtro-option').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const value = btn.getAttribute('data-value');
+          const text = btn.getAttribute('data-text');
+          filtroDepartamento = value;
+          document.getElementById('departamento-texto').textContent = text;
+          
+          // Actualizar clases activas
+          document.querySelectorAll('#panel-departamento .filtro-option').forEach(b => {
+            b.classList.remove('bg-indigo-50', 'dark:bg-indigo-900/20', 'text-indigo-600', 'dark:text-indigo-400');
+          });
+          btn.classList.add('bg-indigo-50', 'dark:bg-indigo-900/20', 'text-indigo-600', 'dark:text-indigo-400');
+          
+          panelDepto.cerrarPanel();
+          reloadWithPeriodo();
+        });
+      });
+
+      // Configurar panel de rol
+      const panelRol = setupPanelDesplegable('btn-rol', 'panel-rol');
+      document.querySelectorAll('#panel-rol .filtro-option').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const value = btn.getAttribute('data-value');
+          const text = btn.getAttribute('data-text');
+          filtroRol = value;
+          document.getElementById('rol-texto').textContent = text;
+          
+          // Actualizar clases activas
+          document.querySelectorAll('#panel-rol .filtro-option').forEach(b => {
+            b.classList.remove('bg-indigo-50', 'dark:bg-indigo-900/20', 'text-indigo-600', 'dark:text-indigo-400');
+          });
+          btn.classList.add('bg-indigo-50', 'dark:bg-indigo-900/20', 'text-indigo-600', 'dark:text-indigo-400');
+          
+          panelRol.cerrarPanel();
+          reloadWithPeriodo();
+        });
+      });
+    }
+
+    // Inicializar
+    limitarMesesPorAnio();
+    actualizarTextoRango();
+    if (ES_GLOBAL) {
+      actualizarTextoRangoAnios();
+    }
 
     function urlEncuestaEmpleado(empId){
-      const { anio, mes } = getPeriodo();
+      const { anio, mes_inicio } = getPeriodo();
       const u = new URL(`${ENCUESTA_BASE}/${encodeURIComponent(empId)}`, window.location.origin);
       u.searchParams.set('anio', anio);
-      u.searchParams.set('mes',  mes);
+      u.searchParams.set('mes', mes_inicio); // Para compatibilidad con la ruta de encuestas
       return u.toString();
     }
 
@@ -616,7 +1203,6 @@
       const porDepto = agruparPorDepartamento(lista);
       const deptos = Object.keys(porDepto).sort((a,b)=>a.localeCompare(b,'es'));
 
-      // PALETA por departamento
       const palette = [
         '#22c55e',
         '#0ea5e9',

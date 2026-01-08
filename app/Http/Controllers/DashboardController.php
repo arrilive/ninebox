@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
 use App\Models\User;
 use App\Models\NineBox;
@@ -45,8 +46,19 @@ class DashboardController extends Controller
             return redirect()->route('login')->withErrors(['correo' => 'No tienes permiso para acceder.']);
         }
 
-        $anioActual = (int) $request->query('anio', now()->year);
-        $mesActual  = (int) $request->query('mes',  now()->month);
+        // Rangos de años (solo para admin/dueño, por defecto año único)
+        $anioInicio = (int) $request->query('anio_inicio', $request->query('anio', now()->year));
+        $anioFin    = (int) $request->query('anio_fin', $request->query('anio', now()->year));
+        $anioActual = $anioInicio; // Para compatibilidad
+        
+        $mesInicio  = (int) $request->query('mes_inicio', now()->month);
+        $mesFin     = (int) $request->query('mes_fin', now()->month);
+        
+        // Si no se especifica rango, usar mes único (compatibilidad hacia atrás)
+        if (!$request->has('mes_inicio') && !$request->has('mes_fin')) {
+            $mesInicio = (int) $request->query('mes', now()->month);
+            $mesFin = $mesInicio;
+        }
 
         // Empleados según rol
         $empleados = collect();
@@ -55,13 +67,31 @@ class DashboardController extends Controller
         $esDueno = method_exists($usuario, 'esDueno') && $usuario->esDueno();
         $esJefe  = method_exists($usuario, 'esJefe') && $usuario->esJefe();
 
+        // Filtros para admin/dueño
+        $departamentoFiltro = $request->query('departamento');
+        $rolFiltro = $request->query('rol'); // 'jefe', 'empleado', o null para ambos
+
         if ($esSuper || $esDueno) {
-            $empleados = User::whereIn('tipo_usuario_id', [
+            $query = User::whereIn('tipo_usuario_id', [
                     TipoUsuario::TIPOS_USUARIO['jefe'],
                     TipoUsuario::TIPOS_USUARIO['empleado'],
                 ])
-                ->with('departamento')
-                ->get(['id', 'departamento_id', 'nombre', 'apellido_paterno', 'apellido_materno'])
+                ->with('departamento');
+
+            // Filtro por departamento
+            if ($departamentoFiltro && $departamentoFiltro !== 'todos') {
+                $query->where('departamento_id', $departamentoFiltro);
+            }
+
+            // Filtro por rol
+            if ($rolFiltro === 'jefe') {
+                $query->where('tipo_usuario_id', TipoUsuario::TIPOS_USUARIO['jefe']);
+            } elseif ($rolFiltro === 'empleado') {
+                $query->where('tipo_usuario_id', TipoUsuario::TIPOS_USUARIO['empleado']);
+            }
+
+            $empleados = $query
+                ->get(['id', 'departamento_id', 'nombre', 'apellido_paterno', 'apellido_materno', 'tipo_usuario_id'])
                 ->map(function ($emp) {
                     return [
                         'id'                  => $emp->id,
@@ -70,6 +100,7 @@ class DashboardController extends Controller
                         'apellido_materno'    => $emp->apellido_materno,
                         'departamento_id'     => $emp->departamento_id,
                         'departamento_nombre' => $emp->departamento->nombre_departamento ?? 'Sin departamento',
+                        'tipo_usuario_id'     => $emp->tipo_usuario_id,
                     ];
                 });
 
@@ -82,11 +113,31 @@ class DashboardController extends Controller
 
         $cuadrantes = NineBox::orderBy('posicion')->get();
 
-        $rendimientos = Rendimiento::with(['usuario', 'nineBox', 'usuario.departamento'])
-            ->whereIn('usuario_id', $empleados->pluck('id'))
-            ->whereYear('created_at', $anioActual)
-            ->whereMonth('created_at', $mesActual)
-            ->get();
+        // Consulta de rendimientos con rango de años y meses
+        $rendimientosQuery = Rendimiento::with(['usuario', 'nineBox', 'usuario.departamento'])
+            ->whereIn('usuario_id', $empleados->pluck('id'));
+
+        // Si hay rango de años, usar rango de fechas completo
+        if ($anioInicio !== $anioFin) {
+            // Rango que cruza años: usar fechas completas
+            $fechaInicio = Carbon::create($anioInicio, $mesInicio, 1)->startOfMonth();
+            $fechaFin = Carbon::create($anioFin, $mesFin, 1)->endOfMonth();
+            
+            $rendimientosQuery->whereBetween('created_at', [$fechaInicio, $fechaFin]);
+        } elseif ($mesInicio !== $mesFin) {
+            // Mismo año, rango de meses
+            $rendimientosQuery->whereYear('created_at', $anioInicio)
+                ->whereBetween(
+                    \DB::raw('MONTH(created_at)'),
+                    [$mesInicio, $mesFin]
+                );
+        } else {
+            // Un solo mes y año
+            $rendimientosQuery->whereYear('created_at', $anioInicio)
+                ->whereMonth('created_at', $mesInicio);
+        }
+
+        $rendimientos = $rendimientosQuery->get();
 
         $asignacionesActuales = $rendimientos
             ->map(function ($asig) {
@@ -105,10 +156,20 @@ class DashboardController extends Controller
 
         $empleadosEvaluados = $rendimientos->pluck('usuario_id')->unique()->count();
 
+        // Obtener departamentos para el filtro (solo admin/dueño)
+        $departamentos = collect();
+        if ($esSuper || $esDueno) {
+            $departamentos = Departamento::orderBy('nombre_departamento')->get(['id', 'nombre_departamento']);
+        }
+
         return view('ninebox.dashboard', [
             'usuario'              => $usuario,
             'anioActual'           => $anioActual,
-            'mesActual'            => $mesActual,
+            'anioInicio'           => $anioInicio,
+            'anioFin'              => $anioFin,
+            'mesInicio'            => $mesInicio,
+            'mesFin'               => $mesFin,
+            'mesActual'            => $mesInicio, // Para compatibilidad
             'empleados'            => $empleados,
             'totalEmpleados'       => $totalEmpleados,
             'cuadrantes'           => $cuadrantes,
@@ -116,6 +177,9 @@ class DashboardController extends Controller
             'asignacionesActuales' => $asignacionesActuales,
             'empleadosEvaluados'   => $empleadosEvaluados,
             'esSuper'              => $esSuper,
+            'departamentos'        => $departamentos,
+            'departamentoFiltro'   => $departamentoFiltro,
+            'rolFiltro'            => $rolFiltro,
         ]);
     }
 

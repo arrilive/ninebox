@@ -1,13 +1,20 @@
 <x-app-layout>
   @section('title', 'Mi Equipo | 9-Box')
   @php
-    $meses = [1=>'Enero',2=>'Febrero',3=>'Marzo',4=>'Abril',5=>'Mayo',6=>'Junio',7=>'Julio',8=>'Agosto',9=>'Septiembre',10=>'Octubre',11=>'Noviembre',12=>'Diciembre'];
-    $anioActual     = $anio ?? now()->year;
-    $mesActual      = $mes ?? now()->month;
+    $meses = [
+      1=>'Enero',2=>'Febrero',3=>'Marzo',4=>'Abril',5=>'Mayo',6=>'Junio',
+      7=>'Julio',8=>'Agosto',9=>'Septiembre',10=>'Octubre',11=>'Noviembre',12=>'Diciembre'
+    ];
+
+    // Consistencia con el dashboard: leer desde la query
+    $anioActual = request('anio', $anio ?? now()->year);
+    $mesActual  = request('mes',  $mes  ?? now()->month);
+
     $filtroSel      = request('filtro'); // null | evaluado | en_proceso | no_iniciado
     $totalPreguntas = $totalPreguntas ?? 10;
 
-    $authEmail = auth()->user()->correo ?? (auth()->user()->email ?? '');
+    $authEmail  = auth()->user()->correo ?? (auth()->user()->email ?? '');
+    $primerAnio = 2025;
   @endphp
 
   <div class="py-6">
@@ -24,42 +31,80 @@
             <div class="relative">
               <h3 class="text-white font-extrabold text-3xl tracking-tight">Mi Equipo</h3>
               <p class="text-white text-xl leading-snug">
-                Colaboradores — {{ $meses[$mesActual] }} {{ $anioActual }}
+                Colaboradores — {{ $meses[$mesActual] ?? 'Enero' }} {{ $anioActual }}
               </p>
             </div>
           </div>
 
           {{-- Igual que el sidebar base: más aire (p-7/space-y-7) --}}
           <div class="p-7 space-y-7">
-            {{-- Selector de periodo (mismo layout) --}}
-            <section aria-label="Periodo" class="flex flex-wrap items-center gap-3">
-              <div>
-                @php
-                    $primerAnio = 2025;
-                @endphp
 
-                <label for="filtro-anio" class="block text-sm font-medium text-gray-700 dark:text-white mb-1">Año</label>
-                <select id="filtro-anio"
-                        class="rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900/70 dark:text-white
-                                focus:border-indigo-500 focus:ring-indigo-500">
-                  @for ($y = now()->year; $y >= $primerAnio; $y--)
-                    <option value="{{ $y }}" @selected($y==$anioActual)>{{ $y }}</option>
-                  @endfor
-                </select>
-              </div>
+            {{-- Selector de periodo: mismo patrón visual que el dashboard (botón + panel) --}}
+            <section aria-label="Periodo" class="space-y-4 border-b border-gray-200 dark:border-gray-700 pb-6">
+              {{-- Año (botón + panel) --}}
               <div>
-                <label for="filtro-mes" class="block text-sm font-medium text-gray-700 dark:text-white mb-1">Mes</label>
-                <select id="filtro-mes"
-                        class="rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900/70 dark:text-white
-                               focus:border-indigo-500 focus:ring-indigo-500">
-                  @foreach ($meses as $num => $m)
-                    <option value="{{ $num }}" @selected($num==$mesActual)>{{ $m }}</option>
-                  @endforeach
-                </select>
+                <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1.5">Año</label>
+                <div class="relative">
+                  <button type="button" id="btn-anio"
+                    class="w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-900/70
+                           focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 text-left flex items-center justify-between
+                           bg-white dark:bg-gray-900/70 hover:bg-gray-50 dark:hover:bg-gray-800/70 transition-colors text-sm
+                           text-gray-900 dark:text-white">
+                    <span id="anio-texto" class="text-gray-900 dark:text-white">{{ $anioActual }}</span>
+                    <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                  </button>
+
+                  <div id="panel-anio"
+                    class="hidden absolute z-50 mt-2 left-0 right-0 min-w-[120px] bg-white dark:bg-gray-800 rounded-lg shadow-xl
+                           border border-gray-200 dark:border-gray-700 p-2 max-h-60 overflow-y-auto">
+                    @for ($y = now()->year; $y >= $primerAnio; $y--)
+                      <button type="button"
+                        class="filtro-option w-full text-left px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors
+                               text-gray-900 dark:text-white {{ (int)$y === (int)$anioActual ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400' : '' }}"
+                        data-value="{{ $y }}" data-text="{{ $y }}">
+                        {{ $y }}
+                      </button>
+                    @endfor
+                  </div>
+                </div>
+              </div>
+
+              {{-- Mes (botón + panel, sólo 1 a la vez) --}}
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1.5">Mes</label>
+                <div class="relative">
+                  <button type="button" id="btn-mes"
+                    class="w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-900/70
+                           focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 text-left flex items-center justify-between
+                           bg-white dark:bg-gray-900/70 hover:bg-gray-50 dark:hover:bg-gray-800/70 transition-colors text-sm
+                           text-gray-900 dark:text-white">
+                    <span id="mes-texto" class="text-gray-900 dark:text-white">
+                      {{ $meses[$mesActual] ?? 'Enero' }}
+                    </span>
+                    <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                  </button>
+
+                  <div id="panel-mes"
+                    class="hidden absolute z-50 mt-2 left-0 right-0 min-w-[200px] bg-white dark:bg-gray-800 rounded-lg shadow-xl
+                           border border-gray-200 dark:border-gray-700 p-2 max-h-60 overflow-y-auto">
+                    @foreach ($meses as $num => $m)
+                      <button type="button"
+                        class="filtro-option w-full text-left px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors
+                               text-gray-900 dark:text-white {{ (int)$num === (int)$mesActual ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400' : '' }}"
+                        data-value="{{ $num }}" data-text="{{ $m }}">
+                        {{ $m }}
+                      </button>
+                    @endforeach
+                  </div>
+                </div>
               </div>
             </section>
 
-            {{-- KPIs (ahora clickables) --}}
+            {{-- KPIs (clickables hacia filtros rápidos) --}}
             <section aria-label="Indicadores clave">
               <div class="kpi-glass">
                 <div
@@ -106,7 +151,11 @@
               {{-- Filtros rápidos --}}
               <div class="filters flex flex-wrap items-center gap-2 w-full justify-center mt-3 sm:mt-0 sm:w-auto sm:justify-end sm:ml-auto">
                 @php
-                  $base = fn($f)=>route('encuestas.empleados', ['anio'=>$anioActual,'mes'=>$mesActual,'filtro'=>$f]);
+                  $base = fn($f) => route('encuestas.empleados', [
+                    'anio'   => $anioActual,
+                    'mes'    => $mesActual,
+                    'filtro' => $f,
+                  ]);
                 @endphp
                 <a href="{{ $base(null) }}"
                    id="filter-todos"
@@ -132,7 +181,13 @@
             </div>
 
             {{-- Lista --}}
-            @php $colores = ['evaluado'=>'chip-success', 'en_proceso'=>'chip-warning', 'no_iniciado'=>'chip-danger']; @endphp
+            @php
+              $colores = [
+                'evaluado'    => 'chip-success',
+                'en_proceso'  => 'chip-warning',
+                'no_iniciado' => 'chip-danger'
+              ];
+            @endphp
 
             <ul id="lista-empleados" class="space-y-3">
               @foreach ($empleados as $e)
@@ -160,7 +215,11 @@
                       {{ ucfirst(str_replace('_', ' ', $e['estado'])) }}
                     </span>
                     <a
-                      href="{{ route('encuestas.show', ['empleado'=>$e['id'],'anio'=>$anioActual,'mes'=>$mesActual]) }}"
+                      href="{{ route('encuestas.show', [
+                        'empleado' => $e['id'],
+                        'anio'     => $anioActual,
+                        'mes'      => $mesActual,
+                      ]) }}"
                       class="btn btn-primary btn-sm open-encuesta-btn btn-eval-fixed"
                     >Evaluar</a>
                   </div>
@@ -173,6 +232,7 @@
             </div>
           </div>
         </div>
+
       </div>
     </div>
   </div>
@@ -215,19 +275,51 @@
     .chip-warning{background-image:linear-gradient(90deg,#eab308 0%, var(--status-proceso) 100%)}
     .chip-danger{background-image:linear-gradient(90deg,#ef4444 0%,#dc2626 100%)}
 
-    .kpi-glass{position:relative;padding:1.1rem;border-radius:var(--radius-lg);background:linear-gradient(180deg,var(--glass-0),var(--glass-1));
-      border:1px solid rgba(255,255,255,.06);box-shadow:0 10px 28px rgba(2,6,23,.20) inset,0 8px 22px rgba(2,6,23,.12)}
-    @media (prefers-color-scheme: light){ .kpi-glass{background:linear-gradient(180deg,rgba(15,23,42,.06),rgba(15,23,42,.04));border:1px solid rgba(15,23,42,.06)} }
-    .kpi-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:.85rem;padding:1rem 1.1rem;border-radius:.8rem;background:rgba(2,6,23,.08)}
-    .kpi-row + .kpi-row{margin-top:.75rem} @media (prefers-color-scheme: dark){ .kpi-row{background:rgba(2,6,23,.18)} }
+    .kpi-glass{
+      position:relative;padding:1.1rem;border-radius:var(--radius-lg);
+      background:linear-gradient(180deg,var(--glass-0),var(--glass-1));
+      border:1px solid rgba(255,255,255,.06);
+      box-shadow:0 10px 28px rgba(2,6,23,.20) inset,0 8px 22px rgba(2,6,23,.12)
+    }
+    @media (prefers-color-scheme: light){
+      .kpi-glass{
+        background:linear-gradient(180deg,rgba(15,23,42,.06),rgba(15,23,42,.04));
+        border:1px solid rgba(15,23,42,.06)
+      }
+    }
+    .kpi-row{
+      display:grid;grid-template-columns:1fr auto;align-items:center;gap:.85rem;
+      padding:1rem 1.1rem;border-radius:.8rem;background:rgba(2,6,23,.08)
+    }
+    .kpi-row + .kpi-row{margin-top:.75rem}
+    @media (prefers-color-scheme: dark){
+      .kpi-row{background:rgba(2,6,23,.18)}
+    }
     .kpi-label{font-weight:700;font-size:1rem;letter-spacing:.2px}
     .kpi-value{font-weight:800;font-size:2.15rem;line-height:1;color:#0b1020;letter-spacing:.2px}
-    @media (prefers-color-scheme: dark){ .kpi-value{color:#e6eef8;text-shadow:0 1px 0 rgba(0,0,0,.15)} }
+    @media (prefers-color-scheme: dark){
+      .kpi-value{color:#e6eef8;text-shadow:0 1px 0 rgba(0,0,0,.15)}
+    }
 
-    .lista-empleado{padding:.78rem;border-radius:.85rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;background:linear-gradient(180deg,rgba(255,255,255,.64),rgba(255,255,255,.50));transition:transform .12s ease,box-shadow .12s ease;border-left:4px solid transparent}
-    .lista-empleado:hover{transform:translateY(-4px);box-shadow:0 12px 30px rgba(2,6,23,.06)}
-    @media (prefers-color-scheme: dark){ .lista-empleado{background:linear-gradient(180deg,rgba(15,23,42,.14),rgba(15,23,42,.06))} }
-    .avatar-icon{width:44px;height:44px;border-radius:9999px;display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(15,23,42,.06),rgba(67,56,202,.06));box-shadow:0 4px 12px rgba(2,6,23,.06);color:#0f172a}
+    .lista-empleado{
+      padding:.78rem;border-radius:.85rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;
+      background:linear-gradient(180deg,rgba(255,255,255,.64),rgba(255,255,255,.50));
+      transition:transform .12s ease,box-shadow .12s ease;border-left:4px solid transparent
+    }
+    .lista-empleado:hover{
+      transform:translateY(-4px);
+      box-shadow:0 12px 30px rgba(2,6,23,.06)
+    }
+    @media (prefers-color-scheme: dark){
+      .lista-empleado{
+        background:linear-gradient(180deg,rgba(15,23,42,.14),rgba(15,23,42,.06))
+      }
+    }
+    .avatar-icon{
+      width:44px;height:44px;border-radius:9999px;display:inline-flex;align-items:center;justify-content:center;
+      background:linear-gradient(180deg,rgba(15,23,42,.06),rgba(67,56,202,.06));
+      box-shadow:0 4px 12px rgba(2,6,23,.06);color:#0f172a
+    }
 
     .status-proceso-label{ color: var(--status-proceso); }
 
@@ -246,7 +338,7 @@
       font-size:.88rem;
     }
 
-    /* Filtros más grandes en móvil y centrados; tamaño previo en sm+ */
+    /* Filtros rápidos */
     .filters .filter-chip{
       padding:.6rem 1rem;
       font-size:.95rem;
@@ -258,6 +350,21 @@
         font-size:.9rem;
       }
     }
+
+    /* Paneles desplegables Año/Mes */
+    #panel-anio,
+    #panel-mes{
+      animation: slideDown 0.2s ease-out;
+    }
+
+    @keyframes slideDown{
+      from{opacity:0;transform:translateY(-8px);}
+      to{opacity:1;transform:translateY(0);}
+    }
+
+    .filtro-option{
+      font-size:0.875rem;
+    }
   </style>
 
   {{-- JS --}}
@@ -265,95 +372,200 @@
     (function(){
       'use strict';
 
-      const AUTH_EMAIL = @json($authEmail);
-      const ANIO_INIT  = {{ (int)$anioActual }};
-      const MES_INIT   = {{ (int)$mesActual }};
-      const TOTAL      = {{ (int)$totalPreguntas }};
-      const FILTRO     = @json($filtroSel); // null | 'evaluado' | 'en_proceso' | 'no_iniciado'
-      // Año/mes reales del sistema
-      const ANIO_HOY   = {{ now()->year }};
-      const MES_HOY    = {{ now()->month }};
+      const AUTH_EMAIL  = @json($authEmail);
+      const ANIO_ACTUAL = {{ (int)$anioActual }};
+      const MES_ACTUAL  = {{ (int)$mesActual }};
+      const TOTAL       = {{ (int)$totalPreguntas }};
+      const FILTRO      = @json($filtroSel); // null | 'evaluado' | 'en_proceso' | 'no_iniciado'
 
-      // Periodo (si hay sidebar): actualización automática
-      const anioEl = document.getElementById('filtro-anio');
-      const mesEl  = document.getElementById('filtro-mes');
+      const ANIO_HOY    = {{ now()->year }};
+      const MES_HOY     = {{ now()->month }};
 
-      // Guardamos las opciones originales de mes (1..12) para reconstruirlas
-      const OPCIONES_MESES_ORIGINALES = mesEl
-        ? Array.from(mesEl.options).map(o => ({
-            value: o.value,
-            text:  o.text,
-          }))
-        : [];
+      let filtroAnio = ANIO_ACTUAL;
+      let filtroMes  = MES_ACTUAL;
 
-      function limitarMesesPorAnio() {
-        if (!anioEl || !mesEl || OPCIONES_MESES_ORIGINALES.length === 0) return;
+      const NOMBRES_MESES = {
+        1:'Enero',2:'Febrero',3:'Marzo',4:'Abril',5:'Mayo',6:'Junio',
+        7:'Julio',8:'Agosto',9:'Septiembre',10:'Octubre',11:'Noviembre',12:'Diciembre'
+      };
 
-        const anioSel   = parseInt(anioEl.value || ANIO_INIT, 10);
-        const limiteMes = (anioSel === ANIO_HOY) ? MES_HOY : 12; // si es el año actual, hasta el mes actual
-        const mesPrevio = parseInt(mesEl.value || MES_INIT, 10);
+      // --------- Utilidad: cerrar paneles ----------
+      const todosLosPaneles = [
+        { id: 'panel-anio', btnId: 'btn-anio' },
+        { id: 'panel-mes',  btnId: 'btn-mes'  },
+      ];
 
-        mesEl.innerHTML = '';
-
-        OPCIONES_MESES_ORIGINALES.forEach(optData => {
-          const v = parseInt(optData.value, 10);
-          if (Number.isNaN(v)) return;
-
-          if (v > limiteMes) return; // no dejamos ir al futuro
-
-          const opt = document.createElement('option');
-          opt.value = optData.value;
-          opt.textContent = optData.text;
-
-          if (v === mesPrevio && v <= limiteMes) {
-            opt.selected = true;
+      function cerrarOtrosPaneles(panelIdExcluido){
+        todosLosPaneles.forEach(({id,btnId})=>{
+          if (id === panelIdExcluido) return;
+          const panel = document.getElementById(id);
+          const btn   = document.getElementById(btnId);
+          if (panel && !panel.classList.contains('hidden')){
+            panel.classList.add('hidden');
+            if (btn && btn._clickOutsideHandler){
+              document.removeEventListener('click', btn._clickOutsideHandler);
+              btn._clickOutsideHandler = null;
+            }
           }
-
-          mesEl.appendChild(opt);
         });
-
-        if (!mesEl.value) {
-          mesEl.value = String(limiteMes);
-        }
       }
 
+      function setupPanelDesplegable(btnId, panelId){
+        const btn   = document.getElementById(btnId);
+        const panel = document.getElementById(panelId);
+        if (!btn || !panel) return;
+
+        let clickOutsideHandler = null;
+
+        function abrirPanel(e){
+          e?.stopPropagation();
+          cerrarOtrosPaneles(panelId);
+          panel.classList.remove('hidden');
+
+          setTimeout(()=>{
+            clickOutsideHandler = (ev)=>{
+              if (!panel.contains(ev.target) && !btn.contains(ev.target)){
+                cerrarPanel();
+              }
+            };
+            btn._clickOutsideHandler = clickOutsideHandler;
+            document.addEventListener('click', clickOutsideHandler);
+          }, 80);
+        }
+
+        function cerrarPanel(){
+          panel.classList.add('hidden');
+          if (clickOutsideHandler){
+            document.removeEventListener('click', clickOutsideHandler);
+            clickOutsideHandler = null;
+            btn._clickOutsideHandler = null;
+          }
+        }
+
+        btn.addEventListener('click', (e)=>{
+          if (panel.classList.contains('hidden')) abrirPanel(e);
+          else cerrarPanel();
+        });
+
+        document.addEventListener('keydown', (e)=>{
+          if (e.key === 'Escape' && !panel.classList.contains('hidden')){
+            cerrarPanel();
+          }
+        });
+
+        return { abrirPanel, cerrarPanel };
+      }
+
+      // --------- Navegación ----------
       function buildUrl(anio, mes){
         const url = new URL(window.location.href);
         url.searchParams.set('anio', anio);
-        url.searchParams.set('mes', mes);
+        url.searchParams.set('mes',  mes);
+
         if (FILTRO) url.searchParams.set('filtro', FILTRO);
-        else url.searchParams.delete('filtro');
+        else        url.searchParams.delete('filtro');
+
         return url.toString();
       }
 
       function navigate(){
-        const a = anioEl?.value || ANIO_INIT;
-        const m = mesEl?.value  || MES_INIT;
-        window.location.href = buildUrl(a, m);
+        window.location.href = buildUrl(filtroAnio, filtroMes);
       }
 
-      // Limitar meses al cargar
-      limitarMesesPorAnio();
+      // --------- Lógica Año/Mes ----------
+      const panelAnio = setupPanelDesplegable('btn-anio','panel-anio');
+      const panelMes  = setupPanelDesplegable('btn-mes','panel-mes');
 
-      // Al cambiar año: ajustamos meses + navegamos
-      anioEl?.addEventListener('change', function(){
-        limitarMesesPorAnio();
-        navigate();
+      function limitarMesesPorAnio(){
+        const limiteMes = (parseInt(filtroAnio,10) === ANIO_HOY) ? MES_HOY : 12;
+
+        document.querySelectorAll('#panel-mes .filtro-option').forEach(btn=>{
+          const v = parseInt(btn.getAttribute('data-value'),10);
+          if (v > limiteMes){
+            btn.disabled = true;
+            btn.classList.add('opacity-40','cursor-not-allowed');
+          }else{
+            btn.disabled = false;
+            btn.classList.remove('opacity-40','cursor-not-allowed');
+          }
+
+          btn.classList.remove('bg-indigo-50','dark:bg-indigo-900/20','text-indigo-600','dark:text-indigo-400');
+          if (v === filtroMes){
+            btn.classList.add('bg-indigo-50','dark:bg-indigo-900/20','text-indigo-600','dark:text-indigo-400');
+          }
+        });
+
+        if (filtroMes > limiteMes){
+          filtroMes = limiteMes;
+        }
+
+        const lblMes = document.getElementById('mes-texto');
+        if (lblMes){
+          lblMes.textContent = NOMBRES_MESES[filtroMes] || '';
+        }
+      }
+
+      // Click en año
+      document.querySelectorAll('#panel-anio .filtro-option').forEach(btn=>{
+        btn.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          const value = parseInt(btn.getAttribute('data-value'),10);
+          const text  = btn.getAttribute('data-text') || value;
+
+          filtroAnio = value;
+
+          const lbl = document.getElementById('anio-texto');
+          if (lbl) lbl.textContent = text;
+
+          document.querySelectorAll('#panel-anio .filtro-option').forEach(b=>{
+            b.classList.remove('bg-indigo-50','dark:bg-indigo-900/20','text-indigo-600','dark:text-indigo-400');
+          });
+          btn.classList.add('bg-indigo-50','dark:bg-indigo-900/20','text-indigo-600','dark:text-indigo-400');
+
+          limitarMesesPorAnio();
+          panelAnio?.cerrarPanel?.();
+          navigate();
+        });
       });
 
-      // Al cambiar solo mes: navegamos
-      mesEl?.addEventListener('change', navigate);
+      // Click en mes
+      document.querySelectorAll('#panel-mes .filtro-option').forEach(btn=>{
+        btn.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          if (btn.disabled) return;
 
-      // ---- Borradores ----
+          const value = parseInt(btn.getAttribute('data-value'),10);
+          const text  = btn.getAttribute('data-text') || value;
+
+          filtroMes = value;
+
+          const lbl = document.getElementById('mes-texto');
+          if (lbl) lbl.textContent = text;
+
+          document.querySelectorAll('#panel-mes .filtro-option').forEach(b=>{
+            b.classList.remove('bg-indigo-50','dark:bg-indigo-900/20','text-indigo-600','dark:text-indigo-400');
+          });
+          btn.classList.add('bg-indigo-50','dark:bg-indigo-900/20','text-indigo-600','dark:text-indigo-400');
+
+          panelMes?.cerrarPanel?.();
+          navigate();
+        });
+      });
+
+      limitarMesesPorAnio();
+
+      // --------- Borradores + fusión de estados ----------
       function draftKey(empId){
-        return `encuesta_${AUTH_EMAIL}_${empId}_${anioEl?.value||ANIO_INIT}_${mesEl?.value||MES_INIT}`;
+        return `encuesta_${AUTH_EMAIL}_${empId}_${ANIO_ACTUAL}_${MES_ACTUAL}`;
       }
+
       function readDraft(empId){
         try{
           const raw = sessionStorage.getItem(draftKey(empId));
           return raw ? JSON.parse(raw) : null;
         }catch(_){ return null; }
       }
+
       function respuestasContestadas(d){
         if (!d || !Array.isArray(d.respuestas)) return 0;
         return d.respuestas.filter(r => r && r.puntaje !== null && r.puntaje !== '' && r.puntaje !== undefined).length;
@@ -365,9 +577,8 @@
         if (!list) return;
 
         const items = Array.from(list.querySelectorAll('li.lista-empleado'));
-        let shown = 0;
+        let shown   = 0;
 
-        // KPIs (si sidebar está)
         const totalEl = document.getElementById('kpi-total');
         const evalEl  = document.getElementById('kpi-evaluados');
         const procEl  = document.getElementById('kpi-proceso');
@@ -376,69 +587,60 @@
         let cTotal=0, cEval=0, cProc=0, cNoIni=0;
 
         items.forEach(li=>{
-          const id = parseInt(li.dataset.empleadoId, 10);
+          const id        = parseInt(li.dataset.empleadoId,10);
           const estadoSrv = String(li.dataset.estado || 'no_iniciado');
-          const progEl = li.querySelector('.progreso-text');
-          const chipEl = li.querySelector('.estado-chip');
-          const btnEl  = li.querySelector('.open-encuesta-btn');
+          const progEl    = li.querySelector('.progreso-text');
+          const chipEl    = li.querySelector('.estado-chip');
+          const btnEl     = li.querySelector('.open-encuesta-btn');
 
           let estado = estadoSrv;
           let prog   = li.dataset.progreso || '';
 
-          // No mezclar borrador si ya está evaluado
           if (estadoSrv !== 'evaluado'){
-            const d = readDraft(id);
+            const d      = readDraft(id);
             const filled = respuestasContestadas(d);
             if (filled > 0){
               estado = 'en_proceso';
               prog   = `${filled}/${TOTAL}`;
-            } else {
+            }else{
               estado = 'no_iniciado';
               prog   = `0/${TOTAL}`;
             }
           }
 
-          // pintar UI
           if (progEl) progEl.textContent = prog;
+
           if (chipEl){
             chipEl.classList.remove('chip-success','chip-warning','chip-danger');
-            const estadoTexto = estado.replace('_', ' ');
+            const estadoTexto = estado.replace('_',' ');
             chipEl.textContent = estadoTexto.charAt(0).toUpperCase() + estadoTexto.slice(1);
-            if (estado === 'evaluado')   chipEl.classList.add('chip-success');
-            if (estado === 'en_proceso') chipEl.classList.add('chip-warning');
-            if (estado === 'no_iniciado') chipEl.classList.add('chip-danger');
+            if (estado === 'evaluado')        chipEl.classList.add('chip-success');
+            else if (estado === 'en_proceso') chipEl.classList.add('chip-warning');
+            else                              chipEl.classList.add('chip-danger');
           }
 
-          // botón Evaluar/Ver
-          if (btnEl) {
-            if (estado === 'evaluado') {
-              btnEl.textContent = 'Ver';
-            } else {
-              btnEl.textContent = 'Evaluar';
-            }
+          if (btnEl){
+            btnEl.textContent = (estado === 'evaluado') ? 'Ver' : 'Evaluar';
           }
 
-          // filtro
           const show = (!FILTRO) || (estado === FILTRO);
           li.style.display = show ? '' : 'none';
           if (show) shown++;
 
-          // KPIs
           cTotal++;
-          if (estado === 'evaluado') cEval++;
+          if (estado === 'evaluado')        cEval++;
           else if (estado === 'en_proceso') cProc++;
-          else cNoIni++;
+          else                              cNoIni++;
         });
 
         if (empty) empty.classList.toggle('hidden', shown > 0);
 
-        if (totalEl){ totalEl.textContent = String(cTotal); }
-        if (evalEl){  evalEl.textContent  = String(cEval); }
-        if (procEl){  procEl.textContent  = String(cProc); }
-        if (noiniEl){ noiniEl.textContent = String(cNoIni); }
+        if (totalEl) totalEl.textContent = String(cTotal);
+        if (evalEl)  evalEl.textContent  = String(cEval);
+        if (procEl)  procEl.textContent  = String(cProc);
+        if (noiniEl) noiniEl.textContent = String(cNoIni);
       }
 
-      // ---- KPIs clickables → filtros ----
       function initKpiClicks(){
         const filterMap = {
           'no_iniciado': 'filter-no_iniciado',
@@ -446,19 +648,18 @@
           'evaluado':    'filter-evaluado',
         };
 
-        document.querySelectorAll('.kpi-card[data-filter-target]').forEach(card => {
-          card.addEventListener('click', () => {
+        document.querySelectorAll('.kpi-card[data-filter-target]').forEach(card=>{
+          card.addEventListener('click', ()=>{
             const key   = card.getAttribute('data-filter-target');
             const btnId = filterMap[key];
             if (!btnId) return;
-
             const btn = document.getElementById(btnId);
             if (btn) btn.click();
           });
         });
       }
 
-      document.addEventListener('DOMContentLoaded', () => {
+      document.addEventListener('DOMContentLoaded', ()=>{
         applyStateFusion();
         initKpiClicks();
       });
