@@ -69,6 +69,20 @@ class DashboardController extends Controller
 
         // Filtros para admin/dueño
         $departamentoFiltro = $request->query('departamento');
+        // Manejar múltiples departamentos: puede ser string, array o 'todos'
+        // Laravel convierte automáticamente departamento[] en array
+        $departamentosSeleccionados = [];
+        if ($departamentoFiltro) {
+            if (is_array($departamentoFiltro)) {
+                // Filtrar valores vacíos y 'todos'
+                $departamentosSeleccionados = array_values(array_filter(
+                    $departamentoFiltro, 
+                    fn($d) => $d !== 'todos' && $d !== null && $d !== ''
+                ));
+            } elseif ($departamentoFiltro !== 'todos') {
+                $departamentosSeleccionados = [$departamentoFiltro];
+            }
+        }
         $rolFiltro = $request->query('rol'); // 'jefe', 'empleado', o null para ambos
 
         if ($esSuper || $esDueno) {
@@ -78,9 +92,9 @@ class DashboardController extends Controller
                 ])
                 ->with('departamento');
 
-            // Filtro por departamento
-            if ($departamentoFiltro && $departamentoFiltro !== 'todos') {
-                $query->where('departamento_id', $departamentoFiltro);
+            // Filtro por departamento (múltiple)
+            if (!empty($departamentosSeleccionados)) {
+                $query->whereIn('departamento_id', $departamentosSeleccionados);
             }
 
             // Filtro por rol
@@ -179,6 +193,7 @@ class DashboardController extends Controller
             'esSuper'              => $esSuper,
             'departamentos'        => $departamentos,
             'departamentoFiltro'   => $departamentoFiltro,
+            'departamentosSeleccionados' => $departamentosSeleccionados,
             'rolFiltro'            => $rolFiltro,
         ]);
     }

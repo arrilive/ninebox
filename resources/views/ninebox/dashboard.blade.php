@@ -17,8 +17,9 @@
           $esSuper = $usuarioPresente && method_exists($usuario, 'esSuperusuario') && $usuario->esSuperusuario();
           $esDueno = $usuarioPresente && method_exists($usuario, 'esDueno') && $usuario->esDueno();
           $esJefe  = $usuarioPresente && method_exists($usuario, 'esJefe') && $usuario->esJefe();
-          $departamentoFiltro = request('departamento', 'todos');
-          $rolFiltro = request('rol', 'todos');
+          $departamentoFiltro = $departamentoFiltro ?? request('departamento', 'todos');
+          $departamentosSeleccionados = $departamentosSeleccionados ?? [];
+          $rolFiltro = $rolFiltro ?? request('rol', 'todos');
         @endphp
 
         {{-- Sidebar resumen --}}
@@ -79,7 +80,7 @@
                 <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1.5">Rango de meses</label>
                 <div class="relative">
                   <button type="button" id="btn-rango-meses" 
-                    class="w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-900/70
+                    class="w-full rounded-lg border border-gray-300 dark:border-gray-700
                                focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 text-left flex items-center justify-between
                                bg-white dark:bg-gray-900/70 hover:bg-gray-50 dark:hover:bg-gray-800/70 transition-colors
                                text-gray-900 dark:text-white">
@@ -125,20 +126,22 @@
                   <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1.5">Departamento</label>
                   <div class="relative">
                     <button type="button" id="btn-departamento" 
-                      class="w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-900/70
+                      class="w-full rounded-lg border border-gray-300 dark:border-gray-700
                                  focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 text-left flex items-center justify-between
                                  bg-white dark:bg-gray-900/70 hover:bg-gray-50 dark:hover:bg-gray-800/70 transition-colors
                                  text-gray-900 dark:text-white">
                       <span id="departamento-texto" class="text-gray-900 dark:text-white">
-                        @if($departamentoFiltro === 'todos')
+                        @if(empty($departamentosSeleccionados))
                           Todos los departamentos
-                        @else
+                        @elseif(count($departamentosSeleccionados) === 1)
                           @foreach ($departamentos ?? [] as $depto)
-                            @if((string)$depto->id === (string)$departamentoFiltro)
+                            @if((string)$depto->id === (string)$departamentosSeleccionados[0])
                               {{ $depto->nombre_departamento }}
                               @break
                             @endif
                           @endforeach
+                        @else
+                          {{ count($departamentosSeleccionados) }} departamentos seleccionados
                         @endif
                       </span>
                       <svg class="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -146,18 +149,25 @@
                       </svg>
                     </button>
                     
-                    {{-- Panel desplegable del departamento --}}
-                    <div id="panel-departamento" class="hidden absolute z-50 mt-2 left-0 right-0 min-w-[280px] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-2 max-h-60 overflow-y-auto">
-                      <button type="button" class="filtro-option w-full text-left px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white {{ $departamentoFiltro === 'todos' ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400' : '' }}"
-                        data-value="todos">
-                        Todos los departamentos
-                      </button>
-                      @foreach ($departamentos ?? [] as $depto)
-                        <button type="button" class="filtro-option w-full text-left px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white {{ (string)$depto->id === (string)$departamentoFiltro ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400' : '' }}"
-                          data-value="{{ $depto->id }}" data-text="{{ $depto->nombre_departamento }}">
-                          {{ $depto->nombre_departamento }}
-                        </button>
-                      @endforeach
+                    {{-- Panel desplegable del departamento con checkboxes --}}
+                    <div id="panel-departamento" class="hidden absolute z-50 mt-2 left-0 right-0 min-w-[280px] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-3 max-h-60 overflow-y-auto">
+                      <div class="space-y-2">
+                        <label class="flex items-center px-2 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer">
+                          <input type="checkbox" id="check-todos-departamentos" 
+                            class="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 dark:focus:ring-indigo-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                            {{ empty($departamentosSeleccionados) ? 'checked' : '' }}>
+                          <span class="ml-3 text-sm font-medium text-gray-900 dark:text-white">Todos los departamentos</span>
+                        </label>
+                        @foreach ($departamentos ?? [] as $depto)
+                          <label class="flex items-center px-2 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer">
+                            <input type="checkbox" class="check-departamento w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 dark:focus:ring-indigo-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                              value="{{ $depto->id }}" 
+                              data-text="{{ $depto->nombre_departamento }}"
+                              {{ in_array((string)$depto->id, array_map('strval', $departamentosSeleccionados)) ? 'checked' : '' }}>
+                            <span class="ml-3 text-sm text-gray-900 dark:text-white">{{ $depto->nombre_departamento }}</span>
+                          </label>
+                        @endforeach
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -167,7 +177,7 @@
                   <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1.5">Rol</label>
                   <div class="relative">
                     <button type="button" id="btn-rol" 
-                      class="w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-900/70
+                      class="w-full rounded-lg border border-gray-300 dark:border-gray-700
                                  focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 text-left flex items-center justify-between
                                  bg-white dark:bg-gray-900/70 hover:bg-gray-50 dark:hover:bg-gray-800/70 transition-colors
                                  text-gray-900 dark:text-white">
@@ -268,7 +278,7 @@
                   $primerAnio = 2025;
                 @endphp
                 <button type="button" id="btn-rango-anios" 
-                  class="rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-900/70
+                  class="rounded-lg border border-gray-300 dark:border-gray-700
                              focus:border-indigo-500 focus:ring-indigo-500 py-2 px-4 text-left flex items-center justify-between gap-2
                              bg-white dark:bg-gray-900/70 hover:bg-gray-50 dark:hover:bg-gray-800/70 transition-colors text-sm font-medium
                              text-gray-900 dark:text-white">
@@ -317,7 +327,7 @@
                   $primerAnio = 2025;
                 @endphp
                 <button type="button" id="btn-anio" 
-                  class="rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-900/70
+                  class="rounded-lg border border-gray-300 dark:border-gray-700
                              focus:border-indigo-500 focus:ring-indigo-500 py-2 px-4 text-left flex items-center justify-between gap-2
                              bg-white dark:bg-gray-900/70 hover:bg-gray-50 dark:hover:bg-gray-800/70 transition-colors text-sm font-medium
                              text-gray-900 dark:text-white">
@@ -703,6 +713,10 @@
     let filtroAnioInicio = ANIO_INICIO;
     let filtroAnioFin = ANIO_FIN;
     let filtroDepartamento = @json($departamentoFiltro ?? 'todos');
+    // Convertir a strings para que coincidan con los valores de los checkboxes
+    // Usar Set para evitar duplicados y asegurar que todos sean strings
+    const deptosRaw = @json($departamentosSeleccionados ?? []);
+    let departamentosSeleccionados = Array.from(new Set(deptosRaw.map(d => String(d))));
     let filtroRol = @json($rolFiltro ?? 'todos');
 
     function getPeriodo(){
@@ -751,10 +765,23 @@
       
       // Si es admin/dueño, agregar filtros adicionales
       if (ES_GLOBAL) {
-        if (filtroDepartamento && filtroDepartamento !== 'todos') {
-          url.searchParams.set('departamento', filtroDepartamento);
-        } else {
-          url.searchParams.delete('departamento');
+        // Manejar múltiples departamentos
+        // Limpiar todos los parámetros de departamento primero
+        // Eliminar todos los parámetros que empiecen con 'departamento'
+        const allParams = Array.from(url.searchParams.keys());
+        allParams.forEach(key => {
+          if (key === 'departamento' || key.startsWith('departamento[')) {
+            url.searchParams.delete(key);
+          }
+        });
+        
+        // Agregar solo si hay departamentos seleccionados
+        if (departamentosSeleccionados && departamentosSeleccionados.length > 0) {
+          // Asegurar que no haya duplicados antes de agregar y convertir a strings
+          const departamentosUnicos = Array.from(new Set(departamentosSeleccionados.map(d => String(d))));
+          departamentosUnicos.forEach(deptId => {
+            url.searchParams.append('departamento[]', deptId);
+          });
         }
         if (filtroRol && filtroRol !== 'todos') {
           url.searchParams.set('rol', filtroRol);
@@ -1061,27 +1088,104 @@
       });
     }
 
-    // Configurar panel de departamento (solo admin/dueño)
+    // Configurar panel de departamento con checkboxes (solo admin/dueño)
     if (ES_GLOBAL) {
       const panelDepto = setupPanelDesplegable('btn-departamento', 'panel-departamento');
-      document.querySelectorAll('#panel-departamento .filtro-option').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const value = btn.getAttribute('data-value');
-          const text = btn.getAttribute('data-text');
-          filtroDepartamento = value;
-          document.getElementById('departamento-texto').textContent = text;
+      
+      function actualizarTextoDepartamento() {
+        const textoEl = document.getElementById('departamento-texto');
+        if (departamentosSeleccionados.length === 0) {
+          textoEl.textContent = 'Todos los departamentos';
+        } else if (departamentosSeleccionados.length === 1) {
+          const check = document.querySelector(`.check-departamento[value="${departamentosSeleccionados[0]}"]`);
+          if (check) {
+            textoEl.textContent = check.getAttribute('data-text');
+          } else {
+            textoEl.textContent = '1 departamento seleccionado';
+          }
+        } else {
+          textoEl.textContent = `${departamentosSeleccionados.length} departamentos seleccionados`;
+        }
+      }
+      
+      // Checkbox "Todos"
+      const checkTodos = document.getElementById('check-todos-departamentos');
+      if (checkTodos) {
+        checkTodos.addEventListener('change', (e) => {
+          if (e.target.checked) {
+            // Desmarcar todos los demás
+            document.querySelectorAll('.check-departamento').forEach(cb => {
+              cb.checked = false;
+            });
+            // Limpiar el array completamente
+            departamentosSeleccionados = [];
+            filtroDepartamento = 'todos';
+            actualizarTextoDepartamento();
+            reloadWithPeriodo();
+          }
+        });
+      }
+      
+      // Checkboxes individuales
+      document.querySelectorAll('.check-departamento').forEach(check => {
+        check.addEventListener('change', (e) => {
+          const value = String(e.target.value); // Asegurar que sea string
           
-          // Actualizar clases activas
-          document.querySelectorAll('#panel-departamento .filtro-option').forEach(b => {
-            b.classList.remove('bg-indigo-50', 'dark:bg-indigo-900/20', 'text-indigo-600', 'dark:text-indigo-400');
-          });
-          btn.classList.add('bg-indigo-50', 'dark:bg-indigo-900/20', 'text-indigo-600', 'dark:text-indigo-400');
+          // Convertir todos los valores actuales a strings para comparación consistente
+          departamentosSeleccionados = departamentosSeleccionados.map(d => String(d));
           
-          panelDepto.cerrarPanel();
+          if (e.target.checked) {
+            // Desmarcar "Todos" si está marcado
+            if (checkTodos) {
+              checkTodos.checked = false;
+            }
+            // Agregar a la selección si no está
+            if (!departamentosSeleccionados.includes(value)) {
+              departamentosSeleccionados.push(value);
+            }
+          } else {
+            // Remover de la selección (comparar como strings)
+            departamentosSeleccionados = departamentosSeleccionados.filter(d => String(d) !== String(value));
+            
+            // Si no hay ninguno seleccionado, marcar "Todos"
+            if (departamentosSeleccionados.length === 0 && checkTodos) {
+              checkTodos.checked = true;
+              filtroDepartamento = 'todos';
+            }
+          }
+          
+          // Limpiar duplicados usando Set y asegurar que todos sean strings
+          departamentosSeleccionados = Array.from(new Set(departamentosSeleccionados.map(d => String(d))));
+          
+          actualizarTextoDepartamento();
           reloadWithPeriodo();
         });
       });
+      
+      // Inicializar: marcar checkboxes según los departamentos seleccionados
+      // Asegurar que todos los valores sean strings
+      departamentosSeleccionados = departamentosSeleccionados.map(d => String(d));
+      
+      if (departamentosSeleccionados.length === 0) {
+        if (checkTodos) {
+          checkTodos.checked = true;
+        }
+      } else {
+        if (checkTodos) {
+          checkTodos.checked = false;
+        }
+        document.querySelectorAll('.check-departamento').forEach(cb => {
+          const cbValue = String(cb.value);
+          if (departamentosSeleccionados.includes(cbValue)) {
+            cb.checked = true;
+          } else {
+            cb.checked = false;
+          }
+        });
+      }
+      
+      // Inicializar texto
+      actualizarTextoDepartamento();
 
       // Configurar panel de rol
       const panelRol = setupPanelDesplegable('btn-rol', 'panel-rol');

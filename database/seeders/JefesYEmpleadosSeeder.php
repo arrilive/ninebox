@@ -98,29 +98,41 @@ class JefesYEmpleadosSeeder extends Seeder
             'Manuel David Canul Quijano',
             'Andrea Hernández Bote',
             'Gloria Alejandra Vázquez García',
-            'Jessica Del Razo Cedillo',
+            'Jessica del Razo Cedillo',
             'Roger Iván Gómez Chávez',
+            'Christian Ramírez Olmos',
+            'José Carlos Baladez Espitia',
+            'Luis Ángel Santiago Matías',
+            'Gonzalo Adrián Medel San Vicente',
+            'Mauro González Rodríguez',
+            'Martín Uriel García Espitia',
+            'Hugo Israel Sánchez Zetina',
+            'José David Hernández Garmendia',
+            'Ángel Yasmani Pech Herrera',
+            'Cesar Canché Yama',
             'Rodrigo Díaz Maldonado',
-            'Alondra Berenice Chable Carrillo',
-            'Aarón Concha Riquelme',
-            'Christopher Alexander Guillermo Dimas',
-            'Jorge Alejandro Herrera Solís',
-            'Carlos Erwin Ríos Kuthe',
-            'Víctor Hugo Sánchez Pérez',
             'Sergio Ignacio Ancona Ciau',
             'Roger Abdiel Barrera Vazquez',
-            'José Rubén Calam Cauich',
             'Henry Matías Chan Can',
             'Juan Alejandro Chan Chin',
             'Javier Ricardo Chi Dzib',
             'Héctor Gerardo Chi Dzib',
             'Jorge Manuel González Manzanilla',
-            'Luis Manuel Grajales Rodríguez',
-            'Gerardo de Jesús Franco Cruz',
             'Enrique Lazcano Zamora',
             'José Raúl Martin Pech',
             'Marcos Gabriel Mukul Ku',
+        ],
+    ],
+    [
+        'nombre' => 'Sistemas',
+        'jefe' => 'Gerardo de Jesús Franco Cruz',
+        'empleados' => [
+            'Luis Manuel Grajales Rodríguez',
+            'Christopher Alexander Guillermo Dimas',
+            'Jorge Alejandro Herrera Solís',
+            'Carlos Erwin Ríos Kuthe',
             'Ángel Germán Sánchez Hoil',
+            'Víctor Hugo Sánchez Pérez',
             'Samuel Isaac Valle Chi',
         ],
     ],
@@ -133,6 +145,8 @@ class JefesYEmpleadosSeeder extends Seeder
             'Fernando Quijano Vela',
             'Estefany Yulián Soriano Laines',
             'José Enrique Vallado Sosa',
+            'Itzel Alejandra García Marquez',
+            'Mairani Guadalupe Tejero Vera',
         ],
     ],
     [
@@ -185,6 +199,12 @@ class JefesYEmpleadosSeeder extends Seeder
             $jefeDB = DB::table('usuarios')->where('user_name', $jefe['user_name'])->first();
             if ($jefeDB) {
                 $jefeId = $jefeDB->id;
+                // Si el jefe existe pero es empleado (tipo 3), actualizarlo a jefe (tipo 2)
+                if ($jefeDB->tipo_usuario_id == 3) {
+                    DB::table('usuarios')->where('id', $jefeId)->update([
+                        'tipo_usuario_id' => 2,
+                    ]);
+                }
             } else {
                 $jefeId = DB::table('usuarios')->insertGetId([
                     'user_name' => $jefe['user_name'],
@@ -219,10 +239,10 @@ class JefesYEmpleadosSeeder extends Seeder
                 'departamento_id' => $departamentoId,
             ]);
 
-            // Crear empleados si no existen
+            // Crear empleados si no existen, o actualizar su departamento si ya existen
             foreach ($area['empleados'] as $empleado) {
-                $existe = DB::table('usuarios')->where('user_name', $empleado['user_name'])->exists();
-                if (!$existe) {
+                $empleadoDB = DB::table('usuarios')->where('user_name', $empleado['user_name'])->first();
+                if (!$empleadoDB) {
                     DB::table('usuarios')->insert([
                         'user_name' => $empleado['user_name'],
                         'password' => Hash::make('password123'),
@@ -235,6 +255,11 @@ class JefesYEmpleadosSeeder extends Seeder
                         'departamento_id' => $departamentoId,
                         'created_at' => now(),
                         'updated_at' => now(),
+                    ]);
+                } else {
+                    // Si el empleado ya existe, actualizar su departamento
+                    DB::table('usuarios')->where('id', $empleadoDB->id)->update([
+                        'departamento_id' => $departamentoId,
                     ]);
                 }
             }
