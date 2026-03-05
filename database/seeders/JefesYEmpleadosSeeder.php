@@ -10,6 +10,10 @@ class JefesYEmpleadosSeeder extends Seeder
 {
     public function run(): void
     {
+        $defaultPwd = Hash::make(env('SEEDER_DEFAULT_PASSWORD', 'changeme'));
+        $superPwd   = Hash::make(env('SEEDER_SUPER_PASSWORD', 'changeme-super'));
+        $duenoPwd   = Hash::make(env('SEEDER_DUENO_PASSWORD', 'changeme-dueno'));
+
         // Define tus roles con ID fijo
         $rows = [
             ['id' => 1, 'tipo_nombre' => 'Superadmin', 'descripcion' => 'Acceso total al sistema'],
@@ -208,7 +212,7 @@ class JefesYEmpleadosSeeder extends Seeder
             } else {
                 $jefeId = DB::table('usuarios')->insertGetId([
                     'user_name' => $jefe['user_name'],
-                    'password' => Hash::make('password123'),
+                    'password' => $defaultPwd,
                     'correo' => $jefe['correo'],
                     'nombre' => $jefe['nombre'],
                     'apellido_paterno' => $jefe['apellido_paterno'],
@@ -245,7 +249,7 @@ class JefesYEmpleadosSeeder extends Seeder
                 if (!$empleadoDB) {
                     DB::table('usuarios')->insert([
                         'user_name' => $empleado['user_name'],
-                        'password' => Hash::make('password123'),
+                        'password' => $defaultPwd,
                         'correo' => $empleado['correo'],
                         'nombre' => $empleado['nombre'],
                         'apellido_paterno' => $empleado['apellido_paterno'],
@@ -278,7 +282,7 @@ class JefesYEmpleadosSeeder extends Seeder
         if (!$super) {
             DB::table('usuarios')->insert([
                 'user_name' => "superadmin",
-                'password' => Hash::make('superpassword'),
+                'password' => $superPwd,
                 'correo' => 'ninebox@example.com',
                 'nombre' => "Super",
                 'apellido_paterno' => "Super",
@@ -296,7 +300,7 @@ class JefesYEmpleadosSeeder extends Seeder
         if (!$dueno) {
             DB::table('usuarios')->insert([
                 'user_name'       => 'BPTGroup',
-                'password'        => Hash::make('BTPGroup'),
+                'password'        => $duenoPwd,
                 'correo'          => 'BPTGroup@ninebox.com',
                 'nombre'          => 'Dueño',
                 'apellido_paterno'=> 'General',

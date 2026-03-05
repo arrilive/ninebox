@@ -81,8 +81,16 @@
     {{-- ========= DESKTOP ≥ md ========= --}}
     <div class="hidden md:flex items-center justify-between h-20">
       <div class="flex items-center gap-6">
+        @php
+            $logoEmpresa = match(auth()->user()->empresa?->slug ?? '') {
+                'bpt'      => asset('images/BPT-LOGO.png'),
+                'dunosusa' => asset('images/dunosusa-logo.png'),
+                default    => asset('images/infocomm-logo.png'),
+            };
+            $altEmpresa = auth()->user()->empresa?->nombre ?? 'Logo';
+        @endphp
         <a href="{{ route('ninebox.dashboard') }}" class="shrink-0">
-          <img src="{{ asset('images/BPT-LOGO.png') }}" alt="BPT Logo" class="block h-11 w-auto" />
+          <img src="{{ $logoEmpresa }}" alt="{{ $altEmpresa }}" class="block h-11 w-auto" />
         </a>
 
         <span class="pill text-[1.1rem] select-none">
@@ -154,7 +162,7 @@
     <div class="flex md:hidden items-center justify-between py-2">
       <div class="flex items-center gap-3">
         <a href="{{ route('ninebox.dashboard') }}" class="shrink-0">
-          <img src="{{ asset('images/BPT-LOGO.png') }}" alt="BPT Logo" class="block h-9 w-auto" />
+          <img src="{{ $logoEmpresa }}" alt="{{ $altEmpresa }}" class="block h-9 w-auto" />
         </a>
         <span class="pill text-[0.95rem]">
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">

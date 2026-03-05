@@ -32,6 +32,7 @@ class EncuestaController extends Controller
             // Admin: SOLO jefes
             $empleadosBase = User::query()
                 ->where('tipo_usuario_id', TipoUsuario::TIPOS_USUARIO['jefe'])
+                ->where('empresa_id', $user->empresa_id)
                 ->get();
 
         } else {

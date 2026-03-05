@@ -11,6 +11,7 @@ use App\Models\NineBox;
 use App\Models\Rendimiento;
 use App\Models\TipoUsuario;
 use App\Models\Departamento;
+use App\Models\Empresa;
 
 class DashboardController extends Controller
 {
@@ -67,6 +68,15 @@ class DashboardController extends Controller
         $esDueno = method_exists($usuario, 'esDueno') && $usuario->esDueno();
         $esJefe  = method_exists($usuario, 'esJefe') && $usuario->esJefe();
 
+        // Filtro por empresa
+        if ($esSuper) {
+            $empresaFiltroId = (int) $request->query('empresa_id', 0);
+            $empresas = Empresa::where('activa', true)->orderBy('nombre')->get();
+        } else {
+            $empresaFiltroId = (int) $usuario->empresa_id;
+            $empresas = collect();
+        }
+
         // Filtros para admin/dueño
         $departamentoFiltro = $request->query('departamento');
         // Manejar múltiples departamentos: puede ser string, array o 'todos'
@@ -91,6 +101,10 @@ class DashboardController extends Controller
                     TipoUsuario::TIPOS_USUARIO['empleado'],
                 ])
                 ->with('departamento');
+
+            if ($empresaFiltroId > 0) {
+                $query->where('empresa_id', $empresaFiltroId);
+            }
 
             // Filtro por departamento (múltiple)
             if (!empty($departamentosSeleccionados)) {
@@ -142,7 +156,7 @@ class DashboardController extends Controller
             // Mismo año, rango de meses
             $rendimientosQuery->whereYear('created_at', $anioInicio)
                 ->whereBetween(
-                    \DB::raw('MONTH(created_at)'),
+                    DB::raw('MONTH(created_at)'),
                     [$mesInicio, $mesFin]
                 );
         } else {
@@ -173,7 +187,9 @@ class DashboardController extends Controller
         // Obtener departamentos para el filtro (solo admin/dueño)
         $departamentos = collect();
         if ($esSuper || $esDueno) {
-            $departamentos = Departamento::orderBy('nombre_departamento')->get(['id', 'nombre_departamento']);
+            $departamentos = Departamento::orderBy('nombre_departamento')
+                ->when($empresaFiltroId > 0, fn($q) => $q->where('empresa_id', $empresaFiltroId))
+                ->get(['id', 'nombre_departamento']);
         }
 
         return view('ninebox.dashboard', [
@@ -195,6 +211,8 @@ class DashboardController extends Controller
             'departamentoFiltro'   => $departamentoFiltro,
             'departamentosSeleccionados' => $departamentosSeleccionados,
             'rolFiltro'            => $rolFiltro,
+            'empresas'             => $empresas,
+            'empresaFiltroId'      => $empresaFiltroId,
         ]);
     }
 
@@ -206,6 +224,8 @@ class DashboardController extends Controller
         $mes  = (int) $request->input('mes');
 
         // Si es admin o dueño, ve todos; si es jefe, solo su depto
+        /** @var \App\Models\User $jefe */
+        $jefe = Auth::user();
         $esSuper = method_exists($jefe, 'esSuperusuario') && $jefe->esSuperusuario();
         $esDueno = method_exists($jefe, 'esDueno') && $jefe->esDueno();
 

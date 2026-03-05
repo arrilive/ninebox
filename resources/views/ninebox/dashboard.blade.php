@@ -75,6 +75,28 @@
 
             {{-- Filtros --}}
             <section aria-label="Filtros" class="space-y-4 border-b border-gray-200 dark:border-gray-700 pb-6">
+              {{-- Selector de empresa (solo superadmin) --}}
+              @if ($esSuper)
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1.5">Empresa</label>
+                  <div class="relative">
+                    <select id="filtro-empresa"
+                      class="w-full rounded-lg border border-gray-300 dark:border-gray-700
+                             focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3
+                             bg-white dark:bg-gray-900/70 text-gray-900 dark:text-white text-sm">
+                      <option value="0" {{ ($empresaFiltroId ?? 0) == 0 ? 'selected' : '' }}>
+                        Todas las empresas
+                      </option>
+                      @foreach ($empresas ?? [] as $emp)
+                        <option value="{{ $emp->id }}" {{ ($empresaFiltroId ?? 0) == $emp->id ? 'selected' : '' }}>
+                          {{ $emp->nombre }}
+                        </option>
+                      @endforeach
+                    </select>
+                  </div>
+                </div>
+              @endif
+
               {{-- Rango de meses --}}
               <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-white mb-1.5">Rango de meses</label>
@@ -435,9 +457,7 @@
             <div id="section-asignados" class="mb-2">
               <div id="modal-header-section" class="flex items-center gap-3 mb-4 select-none">
                 <div class="badge-icon bg-gradient-to-r from-green-600 to-emerald-600" id="badge-asignados">
-                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 0 0118 0z"/>
-                  </svg>
+                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </div>
                 <h4 id="title-asignados" class="text-xl font-bold text-gray-900 dark:text-white">Asignados</h4>
                 <span id="count-asignados" class="chip chip-success ml-auto">0</span>
@@ -724,9 +744,9 @@
       const mesFinSel = document.getElementById('filtro-mes-fin')?.value ?? MES_FIN;
       
       // Si es admin/dueño, obtener rangos de años
-      let anioInicioSel = filtroAnioInicio;
-      let anioFinSel = filtroAnioFin;
-      
+      let anioInicioSel = ES_GLOBAL ? filtroAnioInicio : parseInt(filtroAnio, 10);
+      let anioFinSel    = ES_GLOBAL ? filtroAnioFin    : parseInt(filtroAnio, 10);
+
       if (ES_GLOBAL) {
         const anioInicioEl = document.getElementById('filtro-anio-inicio');
         const anioFinEl = document.getElementById('filtro-anio-fin');
@@ -943,13 +963,9 @@
       if (!mesInicioEl || !mesFinEl) return;
 
       // Obtener año actual (para admin/dueño puede ser rango, usar inicio)
-      let anioActual = filtroAnio;
-      if (ES_GLOBAL) {
-        const anioInicioEl = document.getElementById('filtro-anio-inicio');
-        if (anioInicioEl) {
-          anioActual = parseInt(anioInicioEl.value, 10) || filtroAnioInicio;
-        }
-      }
+      let anioActual = ES_GLOBAL
+        ? (parseInt(document.getElementById('filtro-anio-inicio')?.value, 10) || filtroAnioInicio)
+        : parseInt(filtroAnio, 10);
 
       const limiteMes = (anioActual === ANIO_HOY) ? MES_HOY : 12;
       const mesInicioPrevio = parseInt(mesInicioEl.value || MES_INICIO, 10);
@@ -1040,7 +1056,7 @@
           e.stopPropagation();
           const value = btn.getAttribute('data-value');
           const text = btn.getAttribute('data-text');
-          filtroAnio = value;
+          filtroAnio = parseInt(value, 10);
           document.getElementById('anio-texto').textContent = text;
           
           // Actualizar clases activas
@@ -1216,6 +1232,27 @@
       actualizarTextoRangoAnios();
     }
 
+    // Selector de empresa (solo superadmin)
+    const filtroEmpresaEl = document.getElementById('filtro-empresa');
+    if (filtroEmpresaEl) {
+      filtroEmpresaEl.addEventListener('change', function () {
+        const url = new URL(window.location.href);
+        const val = this.value;
+        if (val === '0' || val === '') {
+          url.searchParams.delete('empresa_id');
+        } else {
+          url.searchParams.set('empresa_id', val);
+        }
+        // Resetear filtros de departamento al cambiar empresa
+        url.searchParams.delete('departamento');
+        const allParams = Array.from(url.searchParams.keys());
+        allParams.forEach(key => {
+          if (key.startsWith('departamento[')) url.searchParams.delete(key);
+        });
+        window.location.href = url.toString();
+      });
+    }
+
     function urlEncuestaEmpleado(empId){
       const { anio, mes_inicio } = getPeriodo();
       const u = new URL(`${ENCUESTA_BASE}/${encodeURIComponent(empId)}`, window.location.origin);
@@ -1243,7 +1280,7 @@
       if (title) title.textContent = 'Asignados';
       if (badge) {
         badge.className = 'badge-icon bg-gradient-to-r from-green-600 to-emerald-600';
-        badge.innerHTML = '<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 0 0118 0z"/></svg>';
+        badge.innerHTML = '<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
       }
 
       ul.innerHTML = '';

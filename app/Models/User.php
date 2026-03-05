@@ -22,6 +22,7 @@ class User extends Authenticatable
         'departamento_id',
         'tipo_usuario_id',
         'sucursal_id',
+        'empresa_id',
     ];
 
     protected $hidden = [
@@ -66,6 +67,16 @@ class User extends Authenticatable
         return $this->belongsTo(Sucursal::class, 'sucursal_id');
     }
 
+    public function empresa()
+    {
+        return $this->belongsTo(Empresa::class, 'empresa_id');
+    }
+
+    public function scopeDeEmpresa($query, $empresaId)
+    {
+        return $query->where('empresa_id', $empresaId);
+    }
+
     /**
      * Relación: empleados del mismo departamento (solo tipo empleado).
      * Para jefes: retorna los empleados de su departamento.
@@ -74,7 +85,7 @@ class User extends Authenticatable
     public function empleados()
     {
         return $this->hasMany(self::class, 'departamento_id', 'departamento_id')
-                    ->where('tipo_usuario_id', 3)
+                    ->where('tipo_usuario_id', TipoUsuario::TIPOS_USUARIO['empleado'])
                     ->where('id', '!=', $this->id);
     }
 

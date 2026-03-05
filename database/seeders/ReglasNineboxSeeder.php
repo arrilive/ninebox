@@ -1,5 +1,4 @@
 <?php
-
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
@@ -13,49 +12,52 @@ class ReglasNineboxSeeder extends Seeder
         $now = now();
         DB::table('reglas_ninebox')->truncate();
 
-        // Desempeño
-        $D_bajo  = [5, 7];
-        $D_medio = [8, 16];
-        $D_alto  = [17, 25];
-
-        // Potencial
-        $P_bajo  = [5, 10];
-        $P_medio = [11, 19];
-        $P_alto  = [20, 25];
-
-        $grid = [
-            [1, 3, 4], // Potencial BAJO   (fila inferior)
-            [2, 5, 7], // Potencial MEDIO  (fila media)
-            [6, 8, 9], // Potencial ALTO   (fila superior)
+        // Desempeño (columnas: izq→der)
+        $D = [
+            'bajo'  => [5,  11],
+            'medio' => [12, 18],
+            'alto'  => [19, 25],
         ];
 
-        $D = [$D_bajo, $D_medio, $D_alto];
-        $P = [$P_bajo, $P_medio, $P_alto];
+        // Potencial (filas: abajo→arriba)
+        $P = [
+            'bajo'  => [5,  11],
+            'medio' => [12, 18],
+            'alto'  => [19, 25],
+        ];
 
-        $etq = [
-            ['Bajo desempeño / Bajo potencial',  'Medio desempeño / Bajo potencial',  'Alto desempeño / Bajo potencial'],
-            ['Bajo desempeño / Medio potencial', 'Medio desempeño / Medio potencial', 'Alto desempeño / Medio potencial'],
-            ['Bajo desempeño / Alto potencial',  'Medio desempeño / Alto potencial',  'Alto desempeño / Alto potencial'],
+        // [ninebox_id, etiqueta, min_des, max_des, min_pot, max_pot]
+        $reglas = [
+            // Potencial ALTO
+            [6, 'Bajo desempeño / Alto potencial',   $D['bajo'][0],  $D['bajo'][1],  $P['alto'][0], $P['alto'][1]],
+            [8, 'Medio desempeño / Alto potencial',  $D['medio'][0], $D['medio'][1], $P['alto'][0], $P['alto'][1]],
+            [9, 'Alto desempeño / Alto potencial',   $D['alto'][0],  $D['alto'][1],  $P['alto'][0], $P['alto'][1]],
+            // Potencial MEDIO
+            [2, 'Bajo desempeño / Medio potencial',  $D['bajo'][0],  $D['bajo'][1],  $P['medio'][0], $P['medio'][1]],
+            [5, 'Medio desempeño / Medio potencial', $D['medio'][0], $D['medio'][1], $P['medio'][0], $P['medio'][1]],
+            [7, 'Alto desempeño / Medio potencial',  $D['alto'][0],  $D['alto'][1],  $P['medio'][0], $P['medio'][1]],
+            // Potencial BAJO
+            [1, 'Bajo desempeño / Bajo potencial',   $D['bajo'][0],  $D['bajo'][1],  $P['bajo'][0], $P['bajo'][1]],
+            [3, 'Medio desempeño / Bajo potencial',  $D['medio'][0], $D['medio'][1], $P['bajo'][0], $P['bajo'][1]],
+            [4, 'Alto desempeño / Bajo potencial',   $D['alto'][0],  $D['alto'][1],  $P['bajo'][0], $P['bajo'][1]],
         ];
 
         $rows = [];
-        for ($r = 0; $r < 3; $r++) {          // r: potencial 
-            for ($c = 0; $c < 3; $c++) {      // c: desempeño 
-                $row = [
-                    'min_desempeno' => $D[$c][0],
-                    'max_desempeno' => $D[$c][1],
-                    'min_potencial' => $P[$r][0],
-                    'max_potencial' => $P[$r][1],
-                    'ninebox_id'    => $grid[$r][ $c ],
-                    'etiqueta'      => $etq[$r][ $c ],
-                    'created_at'    => $now,
-                    'updated_at'    => $now,
-                ];
-                if (Schema::hasColumn('reglas_ninebox', 'activo')) {
-                    $row['activo'] = 1;
-                }
-                $rows[] = $row;
+        foreach ($reglas as [$nineboxId, $etiqueta, $minD, $maxD, $minP, $maxP]) {
+            $row = [
+                'ninebox_id'    => $nineboxId,
+                'etiqueta'      => $etiqueta,
+                'min_desempeno' => $minD,
+                'max_desempeno' => $maxD,
+                'min_potencial' => $minP,
+                'max_potencial' => $maxP,
+                'created_at'    => $now,
+                'updated_at'    => $now,
+            ];
+            if (Schema::hasColumn('reglas_ninebox', 'activo')) {
+                $row['activo'] = 1;
             }
+            $rows[] = $row;
         }
 
         DB::table('reglas_ninebox')->insert($rows);

@@ -16,5 +16,6 @@ class DatabaseSeeder extends Seeder
         $this->call(JefesYEmpleadosSeeder::class);
         $this->call(ReglasNineboxSeeder::class);
         $this->call(PreguntasSeeder::class);
+        $this->call(DunosusaSeeder::class);
     }   
 }

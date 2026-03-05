@@ -8,6 +8,8 @@ class Departamento extends Model
 {
     protected $table = 'departamentos';
 
+    protected $fillable = ['nombre_departamento', 'descripcion', 'jefe_id', 'empresa_id'];
+
     // Relación: empleados de este departamento
     public function empleados()
     {
@@ -21,5 +23,10 @@ class Departamento extends Model
     public function jefe()
     {
         return $this->belongsTo(\App\Models\User::class, 'jefe_id');
+    }
+
+    public function empresa()
+    {
+        return $this->belongsTo(Empresa::class, 'empresa_id');
     }
 }

@@ -20,8 +20,7 @@
 
       <!-- Logo principal (ya no clickable) -->
       <div class="mb-8 flex justify-center">
-        <img src="{{ asset('images/BPT-LOGO.png') }}" alt="BPT Group"
-             class="h-16 sm:h-20 w-auto transition-transform duration-300 drop-shadow-md select-none" />
+        <img src="{{ asset('images/infocomm-logo.png') }}" alt="Infocomm" class="h-16 w-auto mx-auto">
       </div>
 
       <!-- Contenido principal -->
