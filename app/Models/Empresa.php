@@ -8,7 +8,7 @@ class Empresa extends Model
 {
     protected $table = 'empresas';
 
-    protected $fillable = ['nombre', 'slug', 'activa'];
+    protected $fillable = ['nombre', 'slug', 'activa', 'logo_path'];
 
     protected $casts = ['activa' => 'boolean'];
 
@@ -22,8 +22,9 @@ class Empresa extends Model
         return $this->hasMany(Departamento::class, 'empresa_id');
     }
 
-    public function sucursales()
+    public function dueno()
     {
-        return $this->hasMany(Sucursal::class, 'empresa_id');
+        return $this->hasOne(User::class, 'empresa_id')
+            ->whereHas('tipoUsuario', fn($q) => $q->where('tipo_nombre', 'Dueño'));
     }
 }
