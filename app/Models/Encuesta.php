@@ -10,7 +10,7 @@ class Encuesta extends Model
 {
     protected $table = 'encuestas';
     protected $fillable = [
-        'usuario_id','total_desempeno','total_potencial','puntaje_final',
+        'usuario_id','evaluador_id','total_desempeno','total_potencial','puntaje_final',
         'ninebox_id','activa','feedback_publico','notas_privadas'
     ];
     protected $casts = [
@@ -21,9 +21,11 @@ class Encuesta extends Model
     ];
 
     // Relaciones
-    public function usuario()    { return $this->belongsTo(User::class, 'usuario_id'); }
-    public function respuestas() { return $this->hasMany(Evaluacion::class, 'encuesta_id'); }
-    public function ninebox()    { return $this->belongsTo(NineBox::class, 'ninebox_id'); }
+    public function usuario()     { return $this->belongsTo(User::class, 'usuario_id'); }
+    public function respuestas()  { return $this->hasMany(Evaluacion::class, 'encuesta_id'); }
+    public function ninebox()     { return $this->belongsTo(NineBox::class, 'ninebox_id'); }
+    public function evaluador()   { return $this->belongsTo(User::class, 'evaluador_id'); }
+    public function rendimiento() { return $this->hasOne(Rendimiento::class, 'encuesta_id'); }
 
     // Scopes útiles
     public function scopeBorrador($q) { return $q->where('activa', true); }

@@ -8,15 +8,12 @@ class Rendimiento extends Model
 {
     protected $table = 'rendimientos';
 
-    // Tabla sin PK autoincremental
-    public $incrementing = false;
-    protected $primaryKey = null;
-
+    // Tabla con PK autoincremental
     // Solo usamos created_at; no hay updated_at
     const CREATED_AT = 'created_at';
     const UPDATED_AT = null;
 
-    protected $fillable = ['usuario_id','ninebox_id','comentario'];
+    protected $fillable = ['usuario_id', 'ninebox_id', 'encuesta_id', 'anio', 'mes', 'comentario'];
 
     protected $casts = [
         'usuario_id' => 'integer',
