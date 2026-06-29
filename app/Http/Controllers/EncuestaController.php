@@ -141,10 +141,7 @@ class EncuestaController extends Controller
 
         $empleadoObj       = User::select('id','nombre','apellido_paterno','apellido_materno')->findOrFail($empleado);
 
-        $comentarioGeneral = null;
-        if (Schema::hasColumn('encuestas', 'notas_privadas')) {
-            $comentarioGeneral = $encuesta->notas_privadas;
-        }
+        $comentarioGeneral = $encuesta->notas_privadas;
 
         $soloLectura = ($encuesta->activa === false) || session('ya_enviada', false);
 
@@ -227,10 +224,8 @@ class EncuestaController extends Controller
         ]);
 
         // Guardar comentario general (si existe la columna)
-        if (Schema::hasColumn('encuestas', 'notas_privadas')) {
-            $encuesta->notas_privadas = $data['comentario_general'] ?? null;
-            $encuesta->save();
-        }
+        $encuesta->notas_privadas = $data['comentario_general'] ?? null;
+        $encuesta->save();
 
         // Guardar/actualizar respuestas de forma segura (sin PK compuesta en Eloquent)
         DB::transaction(function () use ($encuesta, $data) {
@@ -300,9 +295,9 @@ class EncuestaController extends Controller
             $encuesta->total_desempeno = $totalDesempeno;
             $encuesta->total_potencial = $totalPotencial;
 
-            if (Schema::hasColumn('encuestas', 'anio'))    $encuesta->anio    = $anio;
-            if (Schema::hasColumn('encuestas', 'mes'))     $encuesta->mes     = $mes;
-            if (Schema::hasColumn('encuestas', 'jefe_id')) $encuesta->jefe_id = $user->id;
+            $encuesta->anio    = $anio;
+            $encuesta->mes     = $mes;
+            $encuesta->jefe_id = $user->id;
 
             $encuesta->save();
 

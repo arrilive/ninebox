@@ -113,7 +113,7 @@ class User extends Authenticatable
 
     public function getNombreCompletoAttribute()
     {
-        return trim("{$this->apellido_paterno} {$this->apellido_materno}");
+        return trim("{$this->nombre} {$this->apellido_paterno} {$this->apellido_materno}");
     }
 
     public function evaluacionActual()

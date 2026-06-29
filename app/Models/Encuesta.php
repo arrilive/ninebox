@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use App\Models\User;
 
 class Encuesta extends Model
 {
@@ -20,7 +21,7 @@ class Encuesta extends Model
     ];
 
     // Relaciones
-    public function usuario()    { return $this->belongsTo(Usuario::class, 'usuario_id'); }
+    public function usuario()    { return $this->belongsTo(User::class, 'usuario_id'); }
     public function respuestas() { return $this->hasMany(Evaluacion::class, 'encuesta_id'); }
     public function ninebox()    { return $this->belongsTo(NineBox::class, 'ninebox_id'); }
 
