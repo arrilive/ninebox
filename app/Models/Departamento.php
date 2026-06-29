@@ -29,4 +29,9 @@ class Departamento extends Model
     {
         return $this->belongsTo(Empresa::class, 'empresa_id');
     }
+
+    public function scopeDeEmpresa($query, int $empresaId)
+    {
+        return $query->where('empresa_id', $empresaId);
+    }
 }

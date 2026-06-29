@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'puede.evaluar' => \App\Http\Middleware\PuedeEvaluar::class,
+            'solo.superadmin' => \App\Http\Middleware\SoloSuperadmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
