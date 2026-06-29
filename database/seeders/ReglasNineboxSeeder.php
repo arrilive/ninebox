@@ -3,7 +3,6 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class ReglasNineboxSeeder extends Seeder
 {
@@ -13,17 +12,20 @@ class ReglasNineboxSeeder extends Seeder
         DB::table('reglas_ninebox')->truncate();
 
         // Desempeño (columnas: izq→der)
+        // Bajo (5-12):  promedio < 2.5  → por debajo de lo aceptable
+        // Medio (13-19): promedio 2.6-3.8 → cumple expectativas
+        // Alto (20-25): promedio ≥ 4.0  → supera consistentemente
         $D = [
-            'bajo'  => [5,  11],
-            'medio' => [12, 18],
-            'alto'  => [19, 25],
+            'bajo'  => [5,  12],
+            'medio' => [13, 19],
+            'alto'  => [20, 25],
         ];
 
         // Potencial (filas: abajo→arriba)
         $P = [
-            'bajo'  => [5,  11],
-            'medio' => [12, 18],
-            'alto'  => [19, 25],
+            'bajo'  => [5,  12],
+            'medio' => [13, 19],
+            'alto'  => [20, 25],
         ];
 
         // [ninebox_id, etiqueta, min_des, max_des, min_pot, max_pot]
@@ -44,20 +46,17 @@ class ReglasNineboxSeeder extends Seeder
 
         $rows = [];
         foreach ($reglas as [$nineboxId, $etiqueta, $minD, $maxD, $minP, $maxP]) {
-            $row = [
+            $rows[] = [
                 'ninebox_id'    => $nineboxId,
                 'etiqueta'      => $etiqueta,
                 'min_desempeno' => $minD,
                 'max_desempeno' => $maxD,
                 'min_potencial' => $minP,
                 'max_potencial' => $maxP,
+                'activo'        => 1,
                 'created_at'    => $now,
                 'updated_at'    => $now,
             ];
-            if (Schema::hasColumn('reglas_ninebox', 'activo')) {
-                $row['activo'] = 1;
-            }
-            $rows[] = $row;
         }
 
         DB::table('reglas_ninebox')->insert($rows);

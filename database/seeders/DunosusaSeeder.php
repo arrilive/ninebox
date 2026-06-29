@@ -12,6 +12,10 @@ class DunosusaSeeder extends Seeder
     {
         $defaultPwd = Hash::make(env('SEEDER_DEFAULT_PASSWORD', 'changeme'));
 
+        // Lookup dinámico de IDs para no depender de IDs hardcodeados
+        $idJefe     = DB::table('tipos_usuarios')->where('tipo_nombre', 'Jefe')->value('id');
+        $idEmpleado = DB::table('tipos_usuarios')->where('tipo_nombre', 'Empleado')->value('id');
+
         // Verificar que empresa Dunosusa existe (id=2)
         $empresa = DB::table('empresas')->where('slug', 'dunosusa')->first();
         if (!$empresa) {
@@ -56,7 +60,7 @@ class DunosusaSeeder extends Seeder
                 'apellido_paterno'   => 'Medina',
                 'apellido_materno'   => null,
                 'telefono'           => null,
-                'tipo_usuario_id'    => 2,
+                'tipo_usuario_id'    => $idJefe,
                 'departamento_id'    => $deptRHId,
                 'empresa_id'         => $empresaId,
                 'created_at'         => now(),
@@ -65,7 +69,7 @@ class DunosusaSeeder extends Seeder
         } else {
             $jefaId = $jefa->id;
             DB::table('usuarios')->where('id', $jefaId)->update([
-                'tipo_usuario_id' => 2,
+                'tipo_usuario_id' => $idJefe,
                 'departamento_id' => $deptRHId,
                 'empresa_id'      => $empresaId,
             ]);
@@ -96,7 +100,7 @@ class DunosusaSeeder extends Seeder
                     'apellido_paterno' => $emp['apellido_paterno'],
                     'apellido_materno' => $emp['apellido_materno'],
                     'telefono'         => null,
-                    'tipo_usuario_id'  => 3,
+                    'tipo_usuario_id'  => $idEmpleado,
                     'departamento_id'  => $deptRHId,
                     'empresa_id'       => $empresaId,
                     'created_at'       => now(),

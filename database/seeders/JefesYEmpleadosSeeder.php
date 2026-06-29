@@ -14,27 +14,13 @@ class JefesYEmpleadosSeeder extends Seeder
         $superPwd   = Hash::make(env('SEEDER_SUPER_PASSWORD', 'changeme-super'));
         $duenoPwd   = Hash::make(env('SEEDER_DUENO_PASSWORD', 'changeme-dueno'));
 
-        // Define tus roles con ID fijo
-        $rows = [
-            ['id' => 1, 'tipo_nombre' => 'Superadmin', 'descripcion' => 'Acceso total al sistema'],
-            ['id' => 2, 'tipo_nombre' => 'Jefe',       'descripcion' => 'Gestión de equipos y evaluaciones'],
-            ['id' => 3, 'tipo_nombre' => 'Empleado',   'descripcion' => 'Acceso estándar a funcionalidades'],
-            ['id' => 4, 'tipo_nombre' => 'Dueño', 'descripcion' => 'Propietario con visión global de los jefes'],
-        ];
+        // Lookup dinámico de IDs para no depender de IDs hardcodeados
+        $idSuperadmin = DB::table('tipos_usuarios')->where('tipo_nombre', 'Superadmin')->value('id');
+        $idDueno      = DB::table('tipos_usuarios')->where('tipo_nombre', 'Dueño')->value('id');
+        $idJefe       = DB::table('tipos_usuarios')->where('tipo_nombre', 'Jefe')->value('id');
+        $idEmpleado   = DB::table('tipos_usuarios')->where('tipo_nombre', 'Empleado')->value('id');
 
-        // Inserta/actualiza por ID (no duplica si ya existen)
-        DB::table('tipos_usuarios')->upsert(
-            $rows,
-            ['id'],                             // clave única
-            ['tipo_nombre', 'descripcion']      // columnas a actualizar si ya existe
-        );
 
-        $maxId = DB::table('tipos_usuarios')->max('id') ?? 0;
-        try {
-            DB::statement('ALTER TABLE tipos_usuarios AUTO_INCREMENT = ' . ($maxId + 1));
-        } catch (\Throwable $e) {
-        }
-    
        $areas = collect([
     [
         'nombre' => 'Administración',
@@ -204,9 +190,9 @@ class JefesYEmpleadosSeeder extends Seeder
             if ($jefeDB) {
                 $jefeId = $jefeDB->id;
                 // Si el jefe existe pero es empleado (tipo 3), actualizarlo a jefe (tipo 2)
-                if ($jefeDB->tipo_usuario_id == 3) {
+                if ($jefeDB->tipo_usuario_id == $idEmpleado) {
                     DB::table('usuarios')->where('id', $jefeId)->update([
-                        'tipo_usuario_id' => 2,
+                        'tipo_usuario_id' => $idJefe,
                     ]);
                 }
             } else {
@@ -218,7 +204,7 @@ class JefesYEmpleadosSeeder extends Seeder
                     'apellido_paterno' => $jefe['apellido_paterno'],
                     'apellido_materno' => $jefe['apellido_materno'],
                     'telefono' => $jefe['telefono'],
-                    'tipo_usuario_id' => 2, 
+                    'tipo_usuario_id' => $idJefe, 
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -255,7 +241,7 @@ class JefesYEmpleadosSeeder extends Seeder
                         'apellido_paterno' => $empleado['apellido_paterno'],
                         'apellido_materno' => $empleado['apellido_materno'],
                         'telefono' =>   $empleado['telefono'],
-                        'tipo_usuario_id' => 3, 
+                        'tipo_usuario_id' => $idEmpleado, 
                         'departamento_id' => $departamentoId,
                         'created_at' => now(),
                         'updated_at' => now(),
@@ -275,7 +261,7 @@ class JefesYEmpleadosSeeder extends Seeder
             $expectedUserNames[] = $area['jefe']['user_name'];
             $expectedUserNames = array_merge($expectedUserNames, array_column($area['empleados'], 'user_name'));
         }
-        DB::table('usuarios')->whereNotIn('user_name', $expectedUserNames)->whereIn('tipo_usuario_id', [2,3])->delete();
+        DB::table('usuarios')->whereNotIn('user_name', $expectedUserNames)->whereIn('tipo_usuario_id', [$idJefe, $idEmpleado])->delete();
 
         // Crear admin si no existe
         $super = DB::table('usuarios')->where('user_name', 'superadmin')->first();
@@ -288,7 +274,7 @@ class JefesYEmpleadosSeeder extends Seeder
                 'apellido_paterno' => "Super",
                 'apellido_materno' => "Admin",
                 'telefono' => null,
-                'tipo_usuario_id' => 1,
+                'tipo_usuario_id' => $idSuperadmin,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -306,7 +292,7 @@ class JefesYEmpleadosSeeder extends Seeder
                 'apellido_paterno'=> 'General',
                 'apellido_materno'=> null,
                 'telefono'        => null,
-                'tipo_usuario_id' => 4, 
+                'tipo_usuario_id' => $idDueno, 
                 'created_at'      => now(),
                 'updated_at'      => now(),
             ]);
