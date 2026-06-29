@@ -23,4 +23,9 @@ class TipoUsuario extends Model
     {
         return $this->hasMany(User::class, 'tipo_usuario_id');
     }
+
+    public function getNombreAttribute()
+    {
+        return $this->tipo_nombre;
+    }
 }

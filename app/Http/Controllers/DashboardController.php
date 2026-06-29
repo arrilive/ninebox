@@ -42,7 +42,7 @@ class DashboardController extends Controller
         $usuario = $request->user();
 
         // Evitar empleados
-        if (method_exists($usuario, 'esEmpleado') && $usuario->esEmpleado()) {
+        if ($usuario->esEmpleado()) {
             Auth::logout();
             return redirect()->route('login')->withErrors(['correo' => 'No tienes permiso para acceder.']);
         }
@@ -64,9 +64,9 @@ class DashboardController extends Controller
         // Empleados según rol
         $empleados = collect();
 
-        $esSuper = method_exists($usuario, 'esSuperusuario') && $usuario->esSuperusuario();
-        $esDueno = method_exists($usuario, 'esDueno') && $usuario->esDueno();
-        $esJefe  = method_exists($usuario, 'esJefe') && $usuario->esJefe();
+        $esSuper = $usuario->esSuperadmin();
+        $esDueno = $usuario->esDueno();
+        $esJefe  = $usuario->esJefe();
 
         // Filtro por empresa
         if ($esSuper) {
