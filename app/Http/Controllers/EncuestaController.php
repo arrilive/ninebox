@@ -4,18 +4,17 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-use Carbon\Carbon;
-
 use App\Models\User;
 use App\Models\Encuesta;
 use App\Models\Pregunta;
 use App\Models\Evaluacion;
 use App\Models\Rendimiento;
-use App\Models\TipoUsuario;
+use App\Enums\RolUsuario;
+use App\Services\EvaluacionService;
 
 class EncuestaController extends Controller
 {
+    public function __construct(private EvaluacionService $evaluacionService) {}
     /** Lista empleados para el periodo seleccionado y computa estado/progreso básico. */
     public function listaEmpleados(Request $request)
     {
@@ -31,7 +30,9 @@ class EncuestaController extends Controller
         if ($esSuper || $esDueno) {
             // Admin: SOLO jefes
             $empleadosBase = User::query()
-                ->where('tipo_usuario_id', TipoUsuario::TIPOS_USUARIO['jefe'])
+                ->whereHas('tipoUsuario', function ($query) {
+                    $query->where('tipo_nombre', RolUsuario::Jefe->value);
+                })
                 ->where('empresa_id', $user->empresa_id)
                 ->get();
 
@@ -161,50 +162,83 @@ class EncuestaController extends Controller
         ]);
     }
 
-    /**
-     * Guarda borrador o envía; al completar cierra y asigna ninebox.
-     * El comentario final se almacena en encuestas.notas_privadas.
-     */
     public function submit(Request $request, int $empleado)
     {
         $user = $request->user();
         $anio = (int)($request->query('anio', now()->year));
         $mes  = (int)($request->query('mes',  now()->month));
 
-        $esSuper = $user->esSuperadmin();
-        $esDueno = $user->esDueno();
-
-        // Solo jefes se limitan a sus empleados; superadmin y dueño ven todo
-        if (!$esSuper && !$esDueno) {
-            $esDeMiDepto = $user->empleados()->where('id', $empleado)->exists();
-            abort_unless($esDeMiDepto, 403);
+        // 1. Autorización
+        if (!$user->esSuperadmin() && !$user->esDueno()) {
+            abort_unless($user->empleados()->where('id', $empleado)->exists(), 403);
         }
 
-        $encuesta = Encuesta::query()
-            ->where('usuario_id', $empleado)
-            ->whereYear('created_at', $anio)
-            ->whereMonth('created_at', $mes)
-            ->first();
+        // 2. Obtener o crear encuesta borrador
+        $encuesta = Encuesta::where('usuario_id', $empleado)
+            ->where('anio', $anio)
+            ->where('mes', $mes)
+            ->first()
+            ?? Encuesta::create(['usuario_id' => $empleado, 'activa' => true]);
 
-        if (!$encuesta) {
-            $encuesta = Encuesta::create([
-                'usuario_id' => $empleado,
-                'activa'     => true,
+        // 3. Guardia: ya cerrada
+        if ($encuesta->activa === false) {
+            return redirect()->route('encuestas.show', [
+                'empleado' => $empleado, 'anio' => $anio, 'mes' => $mes
+            ])->with('alert', [
+                'type' => 'info',
+                'title' => 'Encuesta ya enviada',
+                'text' => 'Esta evaluación ya había sido enviada. Solo puedes consultarla en modo lectura.',
             ]);
         }
 
-        if ($encuesta->activa === false) {
-            // Ya está cerrada: vuelve a la vista (modo lectura)
-            return redirect()
-                ->route('encuestas.show', ['empleado' => $empleado, 'anio' => $anio, 'mes' => $mes])
+        // 4. Validar
+        $data = $this->validarRespuestas($request);
+
+        // 5. Guardar notas y respuestas
+        $encuesta->notas_privadas = $data['comentario_general'] ?? null;
+        $encuesta->save();
+
+        DB::transaction(fn() => $this->evaluacionService->guardarRespuestas($encuesta, $data['respuestas']));
+
+        // 6. ¿Está completa?
+        $totalPreg   = (int) DB::table('preguntas')->count();
+        $contestadas = (int) Evaluacion::where('encuesta_id', $encuesta->id)->count();
+
+        if ($contestadas >= $totalPreg) {
+            try {
+                $totales = $this->evaluacionService->calcularTotales($encuesta);
+                $regla   = $this->evaluacionService->resolverCuadrante($totales['desempeno'], $totales['potencial']);
+            } catch (\RuntimeException $e) {
+                return redirect()->route('encuestas.show', [
+                    'empleado' => $empleado, 'anio' => $anio, 'mes' => $mes
+                ])->withErrors(['ninebox' => $e->getMessage()]);
+            }
+
+            $encuesta = $this->evaluacionService->cerrarEncuesta($encuesta, $totales['desempeno'], $totales['potencial'], $regla, $anio, $mes, $user);
+            $rendimiento = $this->evaluacionService->registrarRendimiento($encuesta);
+
+            $textoCuadrante = $encuesta->ninebox->nombre ?? "Cuadrante {$encuesta->ninebox_id}";
+
+            return redirect()->route('encuestas.empleados', ['anio' => $anio, 'mes' => $mes])
                 ->with('alert', [
-                    'type'  => 'info',
-                    'title' => 'Encuesta ya enviada',
-                    'text'  => 'Esta evaluación ya había sido enviada. Solo puedes consultarla en modo lectura.',
+                    'type'          => 'success',
+                    'title'         => 'Encuesta enviada',
+                    'text'          => "La evaluación se envió correctamente.<br>El colaborador fue asignado al cuadrante: <strong>{$textoCuadrante}</strong>.",
+                    'quadrant_id'   => $encuesta->ninebox_id,
+                    'quadrant_name' => $textoCuadrante,
                 ]);
         }
 
-        // Normalizar payload: "" -> null en puntajes
+        return redirect()->route('encuestas.empleados', ['anio' => $anio, 'mes' => $mes])
+            ->with('alert', [
+                'type'  => 'success',
+                'title' => 'Borrador guardado',
+                'text'  => 'Tus respuestas se guardaron correctamente. Puedes continuar la evaluación más tarde.',
+            ]);
+    }
+
+    private function validarRespuestas(Request $request): array
+    {
         $payload = $request->all();
         if (isset($payload['respuestas']) && is_array($payload['respuestas'])) {
             foreach ($payload['respuestas'] as $idx => $r) {
@@ -215,149 +249,12 @@ class EncuestaController extends Controller
         }
         $request->replace($payload);
 
-        $data = $request->validate([
+        return $request->validate([
             'respuestas'               => ['required', 'array'],
             'respuestas.*.pregunta_id' => ['required', 'integer', 'exists:preguntas,id'],
             'respuestas.*.puntaje'     => ['nullable', 'integer', 'between:1,5'],
             'respuestas.*.comentario'  => ['nullable', 'string'],
             'comentario_general'       => ['nullable', 'string', 'max:1000'],
         ]);
-
-        // Guardar comentario general (si existe la columna)
-        $encuesta->notas_privadas = $data['comentario_general'] ?? null;
-        $encuesta->save();
-
-        // Guardar/actualizar respuestas de forma segura (sin PK compuesta en Eloquent)
-        DB::transaction(function () use ($encuesta, $data) {
-            foreach ($data['respuestas'] as $r) {
-                $preguntaId = (int) $r['pregunta_id'];
-                $puntaje    = $r['puntaje'] ?? null;
-
-                if ($puntaje === null) {
-                    // Si el usuario desmarcó la respuesta, la eliminamos
-                    Evaluacion::where('encuesta_id', $encuesta->id)
-                        ->where('pregunta_id', $preguntaId)
-                        ->delete();
-                    continue;
-                }
-
-                DB::table('evaluaciones')->updateOrInsert(
-                    [
-                        'encuesta_id' => $encuesta->id,
-                        'pregunta_id' => $preguntaId,
-                    ],
-                    [
-                        'puntaje'    => (int) $puntaje,
-                        'comentario' => $r['comentario'] ?? null,
-                        'created_at' => now(),  
-                        'updated_at' => now(),   
-                    ]
-                );
-            }
-        });
-
-        $totalPreg   = (int) DB::table('preguntas')->count();
-        $contestadas = (int) Evaluacion::where('encuesta_id', $encuesta->id)->count();
-
-        // Si está completa => cerrar y ENVIAR
-        if ($contestadas >= $totalPreg) {
-            $totales = Evaluacion::query()
-                ->join('preguntas','preguntas.id','=','evaluaciones.pregunta_id')
-                ->where('evaluaciones.encuesta_id', $encuesta->id)
-                ->selectRaw("
-                    SUM(CASE WHEN preguntas.categoria = 'desempeno' THEN evaluaciones.puntaje ELSE 0 END) AS total_desempeno,
-                    SUM(CASE WHEN preguntas.categoria = 'potencial'  THEN evaluaciones.puntaje ELSE 0 END) AS total_potencial
-                ")
-                ->first();
-
-            $totalDesempeno = (int)($totales->total_desempeno ?? 0);
-            $totalPotencial = (int)($totales->total_potencial ?? 0);
-
-            $regla = DB::table('reglas_ninebox')
-                ->where('min_desempeno', '<=', $totalDesempeno)
-                ->where('max_desempeno', '>=', $totalDesempeno)
-                ->where('min_potencial', '<=', $totalPotencial)
-                ->where('max_potencial', '>=', $totalPotencial)
-                ->first();
-
-            if (!$regla) {
-                return redirect()
-                    ->route('encuestas.show', ['empleado' => $empleado, 'anio' => $anio, 'mes' => $mes])
-                    ->withErrors([
-                        'ninebox' => "No existe regla para desempeño={$totalDesempeno} y potencial={$totalPotencial}. Revisa reglas_ninebox."
-                    ]);
-            }
-
-            // Cerrar encuesta y escribir métricas
-            $encuesta->activa          = false;
-            $encuesta->enviada_en      = now();
-            $encuesta->ninebox_id      = (int)$regla->ninebox_id;
-            $encuesta->total_desempeno = $totalDesempeno;
-            $encuesta->total_potencial = $totalPotencial;
-
-            $encuesta->anio    = $anio;
-            $encuesta->mes     = $mes;
-            $encuesta->jefe_id = $user->id;
-
-            $encuesta->save();
-
-            $periodo = Carbon::createFromDate((int)$anio, (int)$mes, 1)->startOfDay();
-
-            DB::transaction(function () use ($empleado, $anio, $mes, $encuesta, $periodo) {
-                Rendimiento::where('usuario_id', $empleado)
-                    ->whereYear('created_at', $anio)
-                    ->whereMonth('created_at', $mes)
-                    ->delete();
-
-                $r = new Rendimiento([
-                    'usuario_id' => $empleado,
-                    'ninebox_id' => (int)$encuesta->ninebox_id,
-                ]);
-                $r->timestamps = false;
-                $r->created_at = $periodo;
-                $r->save();
-            });
-
-            // Texto de cuadrante para la alerta
-            $cuadranteId = (int) $encuesta->ninebox_id;
-
-            $nombresCuadrantes = [
-                6 => 'Diamante en bruto',
-                8 => 'Estrella en desarrollo',
-                9 => 'Estrella',
-                2 => 'Mal empleado',
-                5 => 'Personal sólido',
-                7 => 'Elemento importante',
-                1 => 'Inaceptable',
-                3 => 'Aceptable',
-                4 => 'Personal clave',
-            ];
-
-            $textoCuadrante = $nombresCuadrantes[$cuadranteId] ?? "Cuadrante {$cuadranteId}";
-
-            return redirect()
-                ->route('encuestas.empleados', ['anio' => $anio, 'mes' => $mes])
-                ->with('alert', [
-                    'type'          => 'success',
-                    'title'         => 'Encuesta enviada',
-                    'text'          => "La evaluación se envió correctamente.<br>El colaborador fue asignado al cuadrante: <strong>{$textoCuadrante}</strong>.",
-                    'quadrant_id'   => $cuadranteId,
-                    'quadrant_name' => $textoCuadrante,
-                ]);
-
-        }
-
-        if ($encuesta->activa === false) {
-            $encuesta->activa = true;
-            $encuesta->save();
-        }
-
-        return redirect()
-            ->route('encuestas.empleados', ['anio' => $anio, 'mes' => $mes])
-            ->with('alert', [
-                'type'  => 'success',
-                'title' => 'Borrador guardado',
-                'text'  => 'Tus respuestas se guardaron correctamente. Puedes continuar la evaluación más tarde.',
-            ]);
     }
 }
