@@ -18,11 +18,7 @@ return new class extends Migration {
             $table->timestamps();
         });
 
-        // 2. Insertar BPT y Dunosusa
-        DB::table('empresas')->insert([
-            ['id' => 1, 'nombre' => 'BPT',      'slug' => 'bpt',      'activa' => true, 'created_at' => now(), 'updated_at' => now()],
-            ['id' => 2, 'nombre' => 'Dunosusa',  'slug' => 'dunosusa', 'activa' => true, 'created_at' => now(), 'updated_at' => now()],
-        ]);
+        // Las empresas se crean desde la UI o via EmpresasSeeder
 
         // 3. Agregar empresa_id a las 3 tablas (nullable primero para no romper datos existentes)
         Schema::table('departamentos', function (Blueprint $table) {
