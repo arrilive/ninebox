@@ -25,8 +25,8 @@ class EncuestaController extends Controller
 
         $totalPreg = (int) DB::table('preguntas')->count();
 
-        $esSuper = method_exists($user, 'esSuperusuario') && $user->esSuperusuario();
-        $esDueno = method_exists($user, 'esDueno') && $user->esDueno();
+        $esSuper = $user->esSuperadmin();
+        $esDueno = $user->esDueno();
 
         if ($esSuper || $esDueno) {
             // Admin: SOLO jefes
@@ -107,8 +107,8 @@ class EncuestaController extends Controller
         $anio = (int)($request->query('anio', now()->year));
         $mes  = (int)($request->query('mes',  now()->month));
 
-        $esSuper = method_exists($user, 'esSuperusuario') && $user->esSuperusuario();
-        $esDueno = method_exists($user, 'esDueno') && $user->esDueno();
+        $esSuper = $user->esSuperadmin();
+        $esDueno = $user->esDueno();
 
         // Solo jefes se limitan a sus empleados; superadmin y dueño ven todo
         if (!$esSuper && !$esDueno) {
@@ -171,8 +171,8 @@ class EncuestaController extends Controller
         $anio = (int)($request->query('anio', now()->year));
         $mes  = (int)($request->query('mes',  now()->month));
 
-        $esSuper = method_exists($user, 'esSuperusuario') && $user->esSuperusuario();
-        $esDueno = method_exists($user, 'esDueno') && $user->esDueno();
+        $esSuper = $user->esSuperadmin();
+        $esDueno = $user->esDueno();
 
         // Solo jefes se limitan a sus empleados; superadmin y dueño ven todo
         if (!$esSuper && !$esDueno) {

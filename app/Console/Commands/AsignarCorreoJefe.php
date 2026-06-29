@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Models\User;
+use App\Enums\RolUsuario;
 use Illuminate\Support\Facades\Hash;
 
 class AsignarCorreoJefe extends Command
@@ -17,7 +18,9 @@ class AsignarCorreoJefe extends Command
         $correo = $this->argument('correo');
 
         $jefe = User::where('user_name', $username)
-                    ->where('tipo_usuario_id', 2)
+                    ->whereHas('tipoUsuario', function ($query) {
+                        $query->where('tipo_nombre', RolUsuario::Jefe->value);
+                    })
                     ->first();
 
         if (!$jefe) {

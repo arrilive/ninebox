@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Enums\RolUsuario;
 
 class User extends Authenticatable
 {
@@ -91,25 +92,15 @@ class User extends Authenticatable
 
     // ==================== HELPERS ====================
     
-    public function esJefe()
+    public function rol(): RolUsuario
     {
-        return $this->tipoUsuario->tipo_nombre === 'Jefe';
+        return RolUsuario::from($this->tipoUsuario->nombre);
     }
 
-    public function esSuperusuario()
-    {
-        return $this->tipoUsuario->tipo_nombre === 'Superadmin';
-    }
-
-    public function esEmpleado()
-    {
-        return $this->tipoUsuario->tipo_nombre === 'Empleado';
-    }
-
-    public function esDueno()
-    {
-        return $this->tipoUsuario->tipo_nombre === 'Dueño';
-    }
+    public function esSuperadmin(): bool { return $this->rol() === RolUsuario::Superadmin; }
+    public function esDueno(): bool      { return $this->rol() === RolUsuario::Dueno; }
+    public function esJefe(): bool       { return $this->rol() === RolUsuario::Jefe; }
+    public function esEmpleado(): bool   { return $this->rol() === RolUsuario::Empleado; }
 
     public function getNombreCompletoAttribute()
     {
