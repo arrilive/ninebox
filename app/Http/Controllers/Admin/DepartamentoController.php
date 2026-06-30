@@ -35,7 +35,7 @@ class DepartamentoController extends Controller
         if ($request->jefe_id) {
             $jefe = User::find($request->jefe_id);
             $jefe->departamento_id = $departamento->id;
-            
+
             $jefeTypeId = TipoUsuario::where('tipo_nombre', 'Jefe')->value('id');
             if ($jefeTypeId) {
                 $jefe->tipo_usuario_id = $jefeTypeId;
@@ -46,6 +46,30 @@ class DepartamentoController extends Controller
         return redirect()
             ->route('admin.empresas.show', $empresa)
             ->with('success', 'Departamento creado con éxito.');
+    }
+
+    public function editar(Empresa $empresa, Departamento $departamento)
+    {
+        abort_unless($departamento->empresa_id === $empresa->id, 403);
+
+        return view('admin.departamentos.editar', compact('empresa', 'departamento'));
+    }
+
+    public function update(Request $request, Empresa $empresa, Departamento $departamento)
+    {
+        abort_unless($departamento->empresa_id === $empresa->id, 403);
+
+        $data = $request->validate([
+            'nombre_departamento' => 'required|string|max:120',
+        ]);
+
+        $departamento->update([
+            'nombre_departamento' => $data['nombre_departamento'],
+        ]);
+
+        return redirect()
+            ->route('admin.empresas.show', $empresa)
+            ->with('success', 'Departamento actualizado con éxito.');
     }
 
     public function destroy(Empresa $empresa, Departamento $departamento)

@@ -39,16 +39,28 @@ Route::middleware(['auth'])->group(function () {
         // Departamentos (dentro de una empresa)
         Route::get('/empresas/{empresa}/departamentos/crear', [Admin\DepartamentoController::class, 'crear'])
             ->name('departamentos.crear');
+        Route::get('/empresas/{empresa}/departamentos/{departamento}/editar', [Admin\DepartamentoController::class, 'editar'])
+            ->name('departamentos.editar');
         Route::post('/empresas/{empresa}/departamentos', [Admin\DepartamentoController::class, 'store'])
             ->name('departamentos.store');
+        Route::put('/empresas/{empresa}/departamentos/{departamento}', [Admin\DepartamentoController::class, 'update'])
+            ->name('departamentos.update');
         Route::delete('/empresas/{empresa}/departamentos/{departamento}', [Admin\DepartamentoController::class, 'destroy'])
             ->name('departamentos.destroy');
 
         // Usuarios
         Route::get('/empresas/{empresa}/usuarios/crear', [Admin\UsuarioController::class, 'crear'])
             ->name('usuarios.crear');
+        Route::get('/empresas/{empresa}/usuarios/crear/{tipo}', [Admin\UsuarioController::class, 'crearPorTipo'])
+            ->name('usuarios.crear-tipo');
+        Route::get('/empresas/{empresa}/usuarios/{usuario}/editar', [Admin\UsuarioController::class, 'editar'])
+            ->name('usuarios.editar');
+        Route::post('/empresas/{empresa}/usuarios/{tipo}', [Admin\UsuarioController::class, 'storePorTipo'])
+            ->name('usuarios.store-tipo');
         Route::post('/empresas/{empresa}/usuarios', [Admin\UsuarioController::class, 'store'])
             ->name('usuarios.store');
+        Route::put('/empresas/{empresa}/usuarios/{usuario}', [Admin\UsuarioController::class, 'update'])
+            ->name('usuarios.update');
         Route::delete('/empresas/{empresa}/usuarios/{usuario}', [Admin\UsuarioController::class, 'destroy'])
             ->name('usuarios.destroy');
     });

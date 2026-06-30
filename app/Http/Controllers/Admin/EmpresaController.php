@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreEmpresaRequest;
 use App\Models\Empresa;
-use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class EmpresaController extends Controller
 {
@@ -24,6 +24,16 @@ class EmpresaController extends Controller
     public function store(StoreEmpresaRequest $request)
     {
         $data = $request->validated();
+
+        // Generar slug único a partir del nombre
+        $baseSlug = Str::slug($data['nombre']);
+        $slug     = $baseSlug;
+        $counter  = 2;
+        while (Empresa::where('slug', $slug)->exists()) {
+            $slug = "{$baseSlug}-{$counter}";
+            $counter++;
+        }
+        $data['slug']  = $slug;
         $data['activa'] = true;
 
         $empresa = Empresa::create($data);

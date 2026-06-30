@@ -181,6 +181,24 @@ class DashboardController extends Controller
 
         $empleadosEvaluados = $rendimientos->pluck('usuario_id')->unique()->count();
 
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'rendimientos' => $rendimientos->map(function($r) {
+                    return [
+                        'usuario_id' => $r->usuario_id,
+                        'ninebox_id' => $r->ninebox_id,
+                        'nombre' => optional($r->usuario)->nombre,
+                        'apellido_paterno' => optional($r->usuario)->apellido_paterno,
+                        'apellido_materno' => optional($r->usuario)->apellido_materno,
+                        'departamento_id' => optional($r->usuario)->departamento_id,
+                        'departamento_nombre' => optional(optional($r->usuario)->departamento)->nombre_departamento,
+                    ];
+                })->groupBy('ninebox_id'),
+                'totalEmpleados' => $totalEmpleados,
+                'empleadosEvaluados' => $empleadosEvaluados,
+            ]);
+        }
+
         // Obtener departamentos para el filtro (solo admin/dueño)
         $departamentos = collect();
         if ($esSuper || $esDueno) {
