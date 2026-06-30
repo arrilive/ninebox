@@ -85,7 +85,6 @@ class EncuestaController extends Controller
 
         $kpi_total       = $empleadosBase->count();
         $kpi_evaluados   = $empleados->where('estado', 'evaluado')->count();
-        $kpi_en_proceso  = 0;
         $kpi_no_iniciado = $kpi_total - $kpi_evaluados;
 
         return view('encuestas.empleados-index', [
@@ -96,7 +95,6 @@ class EncuestaController extends Controller
             'totalPreguntas'   => $totalPreg,
             'kpi_total'        => $kpi_total,
             'kpi_evaluados'    => $kpi_evaluados,
-            'kpi_en_proceso'   => $kpi_en_proceso,
             'kpi_no_iniciado'  => $kpi_no_iniciado,
         ]);
     }
