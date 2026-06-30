@@ -57,8 +57,7 @@ Route::middleware(['auth'])->group(function () {
             ->name('usuarios.editar');
         Route::post('/empresas/{empresa}/usuarios/{tipo}', [Admin\UsuarioController::class, 'storePorTipo'])
             ->name('usuarios.store-tipo');
-        Route::post('/empresas/{empresa}/usuarios', [Admin\UsuarioController::class, 'store'])
-            ->name('usuarios.store');
+
         Route::put('/empresas/{empresa}/usuarios/{usuario}', [Admin\UsuarioController::class, 'update'])
             ->name('usuarios.update');
         Route::delete('/empresas/{empresa}/usuarios/{usuario}', [Admin\UsuarioController::class, 'destroy'])

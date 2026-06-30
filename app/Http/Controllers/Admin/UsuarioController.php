@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Admin\StoreUsuarioRequest;
+
 use App\Models\Empresa;
 use App\Models\TipoUsuario;
 use App\Models\User;
@@ -70,8 +70,10 @@ class UsuarioController extends Controller
         $usuario->nombre = $data['nombre'];
         $usuario->apellido_paterno = $data['apellido_paterno'] ?? null;
         $usuario->apellido_materno = $data['apellido_materno'] ?? null;
-        $usuario->correo = $data['correo'] ?? null;
-        $usuario->user_name = $data['user_name'] ?? null;
+        if ($tipo !== 'empleado') {
+            $usuario->correo = $data['correo'] ?? null;
+            $usuario->user_name = $data['user_name'] ?? null;
+        }
         if (isset($data['password'])) $usuario->password = bcrypt($data['password']);
         $usuario->empresa_id = $empresa->id;
         $usuario->tipo_usuario_id = $tipoId;
@@ -93,24 +95,7 @@ class UsuarioController extends Controller
         return redirect()->route('admin.empresas.show', $empresa)->with('success', 'Usuario creado con éxito.');
     }
 
-    public function store(StoreUsuarioRequest $request, Empresa $empresa)
-    {
-        $data = $request->validated();
 
-        if (!empty($data['password'])) {
-            $data['password'] = bcrypt($data['password']);
-        } else {
-            unset($data['password']);
-        }
-
-        $usuario = new User($data);
-        $usuario->empresa_id = $empresa->id;
-        $usuario->save();
-
-        return redirect()
-            ->route('admin.empresas.show', $empresa)
-            ->with('success', 'Usuario creado con éxito.');
-    }
 
     public function editar(Empresa $empresa, User $usuario)
     {
@@ -158,9 +143,6 @@ class UsuarioController extends Controller
             $rules = [
                 'nombre' => 'required|string|max:100',
                 'apellido_paterno' => 'nullable|string|max:100',
-                'correo' => 'nullable|email|unique:usuarios,correo,' . $usuario->id,
-                'user_name' => 'nullable|string|unique:usuarios,user_name,' . $usuario->id,
-                'password' => 'nullable|string|min:8|confirmed',
                 'departamento_id' => 'required|exists:departamentos,id',
             ];
         } else {
@@ -172,8 +154,10 @@ class UsuarioController extends Controller
         $usuario->nombre = $data['nombre'];
         $usuario->apellido_paterno = $data['apellido_paterno'] ?? null;
         $usuario->apellido_materno = $data['apellido_materno'] ?? null;
-        $usuario->correo = $data['correo'] ?? null;
-        $usuario->user_name = $data['user_name'] ?? null;
+        if ($tipoNombre !== 'Empleado') {
+            $usuario->correo = $data['correo'] ?? null;
+            $usuario->user_name = $data['user_name'] ?? null;
+        }
         if (isset($data['departamento_id'])) {
             $usuario->departamento_id = $data['departamento_id'];
         }
