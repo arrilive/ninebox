@@ -5,13 +5,12 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Carbon;
 use App\Models\User;
 use App\Models\NineBox;
 use App\Models\Rendimiento;
-use App\Models\TipoUsuario;
 use App\Models\Departamento;
 use App\Models\Empresa;
+use App\Enums\RolUsuario;
 
 class DashboardController extends Controller
 {
@@ -21,7 +20,7 @@ class DashboardController extends Controller
     private function empleadosDelDepartamento($usuario)
     {
         return User::where('departamento_id', $usuario->departamento_id)
-            ->where('tipo_usuario_id', TipoUsuario::TIPOS_USUARIO['empleado'])
+            ->whereHas('tipoUsuario', fn($q) => $q->where('tipo_nombre', RolUsuario::Empleado->value))
             ->where('id', '!=', $usuario->id)
             ->with('departamento')
             ->get(['id', 'departamento_id', 'nombre', 'apellido_paterno', 'apellido_materno'])
@@ -96,10 +95,10 @@ class DashboardController extends Controller
         $rolFiltro = $request->query('rol'); // 'jefe', 'empleado', o null para ambos
 
         if ($esSuper || $esDueno) {
-            $query = User::whereIn('tipo_usuario_id', [
-                    TipoUsuario::TIPOS_USUARIO['jefe'],
-                    TipoUsuario::TIPOS_USUARIO['empleado'],
-                ])
+            $query = User::whereHas('tipoUsuario', fn($q) => $q->whereIn('tipo_nombre', [
+                    RolUsuario::Jefe->value,
+                    RolUsuario::Empleado->value,
+                ]))
                 ->with('departamento');
 
             if ($empresaFiltroId > 0) {
@@ -113,9 +112,9 @@ class DashboardController extends Controller
 
             // Filtro por rol
             if ($rolFiltro === 'jefe') {
-                $query->where('tipo_usuario_id', TipoUsuario::TIPOS_USUARIO['jefe']);
+                $query->whereHas('tipoUsuario', fn($q) => $q->where('tipo_nombre', RolUsuario::Jefe->value));
             } elseif ($rolFiltro === 'empleado') {
-                $query->where('tipo_usuario_id', TipoUsuario::TIPOS_USUARIO['empleado']);
+                $query->whereHas('tipoUsuario', fn($q) => $q->where('tipo_nombre', RolUsuario::Empleado->value));
             }
 
             $empleados = $query
@@ -145,24 +144,22 @@ class DashboardController extends Controller
         $rendimientosQuery = Rendimiento::with(['usuario', 'nineBox', 'usuario.departamento'])
             ->whereIn('usuario_id', $empleados->pluck('id'));
 
-        // Si hay rango de años, usar rango de fechas completo
+        // Filtrar rendimientos por columnas `anio` y `mes` (no por created_at)
         if ($anioInicio !== $anioFin) {
-            // Rango que cruza años: usar fechas completas
-            $fechaInicio = Carbon::create($anioInicio, $mesInicio, 1)->startOfMonth();
-            $fechaFin = Carbon::create($anioFin, $mesFin, 1)->endOfMonth();
-            
-            $rendimientosQuery->whereBetween('created_at', [$fechaInicio, $fechaFin]);
-        } elseif ($mesInicio !== $mesFin) {
-            // Mismo año, rango de meses
-            $rendimientosQuery->whereYear('created_at', $anioInicio)
-                ->whereBetween(
-                    DB::raw('MONTH(created_at)'),
-                    [$mesInicio, $mesFin]
+            $rendimientosQuery->where(fn($q) => $q
+                    ->where('anio', '>', $anioInicio)
+                    ->orWhere(fn($q2) => $q2->where('anio', $anioInicio)->where('mes', '>=', $mesInicio))
+                )
+                ->where(fn($q) => $q
+                    ->where('anio', '<', $anioFin)
+                    ->orWhere(fn($q2) => $q2->where('anio', $anioFin)->where('mes', '<=', $mesFin))
                 );
+        } elseif ($mesInicio !== $mesFin) {
+            $rendimientosQuery->where('anio', $anioInicio)
+                ->whereBetween('mes', [$mesInicio, $mesFin]);
         } else {
-            // Un solo mes y año
-            $rendimientosQuery->whereYear('created_at', $anioInicio)
-                ->whereMonth('created_at', $mesInicio);
+            $rendimientosQuery->where('anio', $anioInicio)
+                ->where('mes', $mesInicio);
         }
 
         $rendimientos = $rendimientosQuery->get();
@@ -183,6 +180,24 @@ class DashboardController extends Controller
             ->groupBy('ninebox_id');
 
         $empleadosEvaluados = $rendimientos->pluck('usuario_id')->unique()->count();
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'rendimientos' => $rendimientos->map(function($r) {
+                    return [
+                        'usuario_id' => $r->usuario_id,
+                        'ninebox_id' => $r->ninebox_id,
+                        'nombre' => optional($r->usuario)->nombre,
+                        'apellido_paterno' => optional($r->usuario)->apellido_paterno,
+                        'apellido_materno' => optional($r->usuario)->apellido_materno,
+                        'departamento_id' => optional($r->usuario)->departamento_id,
+                        'departamento_nombre' => optional(optional($r->usuario)->departamento)->nombre_departamento,
+                    ];
+                })->groupBy('ninebox_id'),
+                'totalEmpleados' => $totalEmpleados,
+                'empleadosEvaluados' => $empleadosEvaluados,
+            ]);
+        }
 
         // Obtener departamentos para el filtro (solo admin/dueño)
         $departamentos = collect();

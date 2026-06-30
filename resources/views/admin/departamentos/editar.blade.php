@@ -1,56 +1,49 @@
 @extends('layouts.app')
 
-@section('title', 'Crear Departamento | NineBox')
+@section('title', 'Editar Departamento | NineBox')
 
 @section('header')
     <x-breadcrumb :items="[
         ['label' => 'Empresas', 'url' => route('admin.empresas.index')],
         ['label' => $empresa->nombre, 'url' => route('admin.empresas.show', $empresa)],
-        ['label' => 'Nuevo departamento', 'url' => null],
+        ['label' => 'Editar departamento', 'url' => null],
     ]" />
     <h2 class="font-semibold text-xl text-ink leading-tight">
-        {{ __('Crear Departamento') }} — {{ $empresa->nombre }}
+        {{ __('Editar Departamento') }} — {{ $empresa->nombre }}
     </h2>
 @endsection
 
 @section('content')
     <div class="py-12 bg-surface min-h-screen">
         <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
-
             <div class="card">
-                <form action="{{ route('admin.departamentos.store', $empresa) }}" method="POST">
+                <form action="{{ route('admin.departamentos.update', [$empresa, $departamento]) }}" method="POST">
                     @csrf
+                    @method('PUT')
 
-                    <!-- Nombre del departamento -->
                     <div class="mb-6">
-                        <label for="nombre" class="form-label">
+                        <label for="nombre_departamento" class="form-label">
                             {{ __('Nombre del departamento') }} <span class="text-danger">*</span>
                         </label>
-                        <input type="text" name="nombre" id="nombre" value="{{ old('nombre') }}"
-                            class="form-input @error('nombre') border-danger @enderror"
+                        <input type="text" name="nombre_departamento" id="nombre_departamento"
+                            value="{{ old('nombre_departamento', $departamento->nombre_departamento) }}"
+                            class="form-input @error('nombre_departamento') border-danger @enderror"
                             placeholder="Ej. Operaciones, Ventas" required>
-                        @error('nombre')
+                        @error('nombre_departamento')
                             <p class="mt-2 text-sm text-danger">{{ $message }}</p>
                         @enderror
                     </div>
 
-                    <!-- Jefe del departamento (se asigna desde el panel de empresa) -->
-                    <p class="text-sm text-ink-2">
-                        {{ __('El jefe se asigna desde el panel de la empresa. Puedes crear el departamento sin jefe y asignarlo después.') }}
-                    </p>
-
-                    <!-- Botones -->
                     <div class="flex items-center justify-end space-x-3 pt-4 border-t border-border">
                         <a href="{{ route('admin.empresas.show', $empresa) }}" class="btn-secondary">
                             {{ __('Cancelar') }}
                         </a>
                         <button type="submit" class="btn-primary">
-                            {{ __('Crear departamento') }}
+                            {{ __('Guardar cambios') }}
                         </button>
                     </div>
                 </form>
             </div>
-
         </div>
     </div>
 @endsection

@@ -10,7 +10,7 @@ class Encuesta extends Model
 {
     protected $table = 'encuestas';
     protected $fillable = [
-        'usuario_id','evaluador_id','total_desempeno','total_potencial','puntaje_final',
+        'usuario_id','evaluador_id','jefe_id','anio','mes','total_desempeno','total_potencial','puntaje_final',
         'ninebox_id','activa','feedback_publico','notas_privadas'
     ];
     protected $casts = [

@@ -6,26 +6,38 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>@yield('title', config('app.name', '9-Box'))</title>
-    
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
 
-    <!-- Scripts -->
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css?family=Inter:400,500,600,700&display=swap" rel="stylesheet">
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+
+    <style>
+      @keyframes fadeSlideUp {
+        from { opacity: 0; transform: translateY(12px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      .anim-fade-up { animation: fadeSlideUp 0.4s cubic-bezier(.2,.8,.3,1) both; }
+      .anim-delay-1 { animation-delay: 0.06s; }
+      .anim-delay-2 { animation-delay: 0.12s; }
+      .anim-delay-3 { animation-delay: 0.18s; }
+      .anim-delay-4 { animation-delay: 0.24s; }
+    </style>
   </head>
 
-  <body class="font-sans text-gray-900 antialiased">
-    <div class="min-h-screen flex flex-col sm:justify-center items-center pt-10 sm:pt-0 bg-gray-100 dark:bg-gray-900">
+  <body class="font-sans antialiased bg-surface text-ink min-h-screen flex items-center justify-center px-4 py-12">
 
-      <!-- Logo principal (ya no clickable) -->
-      <div class="mb-8 flex justify-center">
-        <img src="{{ asset('images/infocomm-logo.png') }}" alt="Infocomm" class="h-16 w-auto mx-auto">
+    <div class="w-full max-w-sm anim-fade-up">
+
+      <!-- Logo -->
+      <div class="flex justify-center mb-8 anim-fade-up">
+        <img src="{{ asset('images/infocomm-logo.png') }}" alt="Infocomm" class="h-14 w-auto">
       </div>
 
-      <!-- Contenido principal -->
-      <div class="w-full sm:max-w-md px-6 py-4 bg-white/90 dark:bg-gray-800/90 backdrop-blur 
-                  shadow-md overflow-hidden sm:rounded-2xl">
+      <!-- Card -->
+      <div class="bg-canvas border border-border rounded-lg shadow-card px-8 py-8 anim-fade-up anim-delay-1">
         {{ $slot }}
       </div>
 

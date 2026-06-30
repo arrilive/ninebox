@@ -43,8 +43,8 @@ class EncuestaController extends Controller
 
         $encuestasPeriodo = Encuesta::query()
             ->whereIn('usuario_id', $empleadosBase->pluck('id'))
-            ->whereYear('created_at', $anio)
-            ->whereMonth('created_at', $mes)
+            ->where('anio', $anio)
+            ->where('mes', $mes)
             ->get()
             ->keyBy('usuario_id');
 
@@ -119,14 +119,18 @@ class EncuestaController extends Controller
 
         $encuesta = Encuesta::query()
             ->where('usuario_id', $empleado)
-            ->whereYear('created_at', $anio)
-            ->whereMonth('created_at', $mes)
+            ->where('anio', $anio)
+            ->where('mes', $mes)
             ->first();
 
         if (!$encuesta) {
             $encuesta = Encuesta::create([
-                'usuario_id' => $empleado,
-                'activa'     => true,
+                'usuario_id'   => $empleado,
+                'evaluador_id' => $user->id,
+                'jefe_id'      => $user->id,
+                'anio'         => $anio,
+                'mes'          => $mes,
+                'activa'       => true,
             ]);
         }
 
@@ -173,12 +177,21 @@ class EncuestaController extends Controller
             abort_unless($user->empleados()->where('id', $empleado)->exists(), 403);
         }
 
-        // 2. Obtener o crear encuesta borrador
         $encuesta = Encuesta::where('usuario_id', $empleado)
             ->where('anio', $anio)
             ->where('mes', $mes)
-            ->first()
-            ?? Encuesta::create(['usuario_id' => $empleado, 'activa' => true]);
+            ->first();
+
+        if (!$encuesta) {
+            $encuesta = Encuesta::create([
+                'usuario_id'   => $empleado,
+                'evaluador_id' => $user->id,
+                'jefe_id'      => $user->id,
+                'anio'         => $anio,
+                'mes'          => $mes,
+                'activa'       => true,
+            ]);
+        }
 
         // 3. Guardia: ya cerrada
         if ($encuesta->activa === false) {

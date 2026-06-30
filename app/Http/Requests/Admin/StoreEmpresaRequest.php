@@ -15,7 +15,6 @@ class StoreEmpresaRequest extends FormRequest
     {
         return [
             'nombre' => 'required|string|max:150',
-            'slug'   => 'required|unique:empresas,slug|regex:/^[a-z0-9-]+$/',
         ];
     }
 }
