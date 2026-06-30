@@ -87,7 +87,7 @@ class User extends Authenticatable
     public function empleados()
     {
         return $this->hasMany(self::class, 'departamento_id', 'departamento_id')
-                    ->whereHas('tipoUsuario', fn($q) => $q->where('tipo_nombre', \App\Enums\RolUsuario::Empleado->value))
+                    ->whereHas('tipoUsuario', fn($q) => $q->where('tipo_nombre', RolUsuario::Empleado->value))
                     ->where('id', '!=', $this->id);
     }
 
