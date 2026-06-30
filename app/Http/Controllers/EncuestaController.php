@@ -43,8 +43,8 @@ class EncuestaController extends Controller
 
         $encuestasPeriodo = Encuesta::query()
             ->whereIn('usuario_id', $empleadosBase->pluck('id'))
-            ->whereYear('created_at', $anio)
-            ->whereMonth('created_at', $mes)
+            ->where('anio', $anio)
+            ->where('mes', $mes)
             ->get()
             ->keyBy('usuario_id');
 
@@ -119,8 +119,8 @@ class EncuestaController extends Controller
 
         $encuesta = Encuesta::query()
             ->where('usuario_id', $empleado)
-            ->whereYear('created_at', $anio)
-            ->whereMonth('created_at', $mes)
+            ->where('anio', $anio)
+            ->where('mes', $mes)
             ->first();
 
         if (!$encuesta) {
